@@ -17,6 +17,28 @@ import { supabase } from './supabase';
 
 export type OutboxOperation = 'upsert' | 'soft_delete';
 
+/**
+ * The unique key each table upserts against, server-side.
+ *
+ * This is per-table and cannot be guessed. Verified against the deployed
+ * schema: only `sessions` is keyed by (client_id, client_generated_id). The
+ * children are keyed by their PARENT plus the generated id, and biometrics and
+ * check-ins are keyed by their natural key — the tuple that makes the row mean
+ * what it means — because the same reading arriving from two devices must
+ * collapse rather than duplicate.
+ *
+ * Getting this wrong does not fail loudly. PostgREST rejects the upsert, the
+ * write retries twelve times and parks, and the client is told nothing while
+ * their data quietly stops arriving.
+ */
+const CONFLICT_TARGET: Record<string, string> = {
+  sessions: 'client_id,client_generated_id',
+  session_exercises: 'session_id,client_generated_id',
+  exercise_sets: 'session_exercise_id,client_generated_id',
+  biometrics: 'client_id,recorded_on,metric,source',
+  daily_checkins: 'client_id,checkin_date',
+};
+
 const MAX_ATTEMPTS = 12;
 const BASE_BACKOFF_MS = 2_000;
 const MAX_BACKOFF_MS = 30 * 60_000;
@@ -96,9 +118,17 @@ export async function drainOutbox(): Promise<DrainResult> {
           .eq('client_generated_id', row.client_generated_id);
         if (error) throw error;
       } else {
+        const onConflict = CONFLICT_TARGET[row.table_name];
+        if (!onConflict) {
+          // A table nobody configured. Park it rather than guess a key and
+          // risk collapsing two distinct rows into one.
+          throw new Error(
+            `No upsert conflict target configured for table "${row.table_name}"`
+          );
+        }
         const { error } = await supabase
           .from(row.table_name)
-          .upsert(payload, { onConflict: 'client_id,client_generated_id' });
+          .upsert(payload, { onConflict });
         if (error) throw error;
       }
 
