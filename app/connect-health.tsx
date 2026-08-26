@@ -14,11 +14,13 @@ import {
   backfillHealthHistory,
   isHealthAvailable,
 } from '../src/lib/health';
+import { useIdentity } from '../src/lib/auth';
 import { color, radius, space, type as t } from '../src/theme';
 
 type Stage = 'intro' | 'requesting' | 'backfilling' | 'done' | 'unavailable';
 
 export default function ConnectHealthScreen() {
+  const { clientId } = useIdentity();
   const [stage, setStage] = useState<Stage>('intro');
   const [progress, setProgress] = useState({ done: 0, total: 1 });
   const [rows, setRows] = useState(0);
@@ -32,7 +34,7 @@ export default function ConnectHealthScreen() {
 
     setStage('backfilling');
     const written = await backfillHealthHistory(
-      'CLIENT_FROM_SESSION',   // wire to auth context
+      clientId,
       2,
       (done, total) => setProgress({ done, total })
     );

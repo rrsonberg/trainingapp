@@ -17,6 +17,7 @@ import {
 import { router } from 'expo-router';
 import { SESSION_TYPES, type SessionTypeKey } from '../src/types/sessions';
 import { createSession, completeSession } from '../src/repositories/sessions';
+import { useIdentity } from '../src/lib/auth';
 import { color, radius, space, type as t } from '../src/theme';
 import { fToC, displayDuration } from '../src/lib/units';
 
@@ -25,6 +26,7 @@ const RECOVERY_TYPES = Object.values(SESSION_TYPES)
   .map((d) => d.key);
 
 export default function LogRecoveryScreen() {
+  const { tenantId, clientId } = useIdentity();
   const [selected, setSelected] = useState<SessionTypeKey>('cold_exposure');
   const [minutes, setMinutes] = useState('');
   const [values, setValues] = useState<Record<string, string>>({});
@@ -58,8 +60,8 @@ export default function LogRecoveryScreen() {
       }
 
       const session = await createSession({
-        tenantId: 'TENANT_FROM_SESSION',   // wire to auth context
-        clientId: 'CLIENT_FROM_SESSION',
+        tenantId,
+        clientId,
         sessionType: selected,
         parameters,
       });
