@@ -23,6 +23,7 @@ Talks to the same Supabase project as the Lovable trainer console.
 | `src/repositories/strength.ts` | Exercises and sets, plus last-time lookup from local data |
 | `src/repositories/checkins.ts` | One row per day, idempotent on re-save |
 | `src/theme.ts` | Design tokens |
+| `src/lib/__tests__/` | Jest, on the pure modules — the ones that fail silently |
 | `app/_layout.tsx` | Root layout and redirect-based auth gate |
 | `app/sign-in.tsx` | Email and password sign-in |
 | `app/check-in.tsx` | Daily check-in and the readiness score it produces |
@@ -37,6 +38,11 @@ Talks to the same Supabase project as the Lovable trainer console.
 npm install
 cp .env.example .env      # fill in your Supabase URL and anon key
 npx expo start
+```
+
+```bash
+npm run typecheck
+npm test
 ```
 
 Requires `schema.sql` already deployed to the Supabase project.
@@ -71,5 +77,3 @@ someone to train through something they should have respected.
 ## Next commits, in order
 
 1. Real home screen — today's session, readiness, the week's balance
-2. A test runner. `src/lib/readinessMath.ts` is pure and was verified against 25
-   cases during development, but there is nowhere in this repo to keep them
