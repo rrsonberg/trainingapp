@@ -1,0 +1,27 @@
+{
+  "name": "coach-app",
+  "version": "0.1.0",
+  "main": "expo-router/entry",
+  "scripts": {
+    "start": "expo start",
+    "ios": "expo run:ios",
+    "android": "expo run:android",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@react-native-async-storage/async-storage": "^2.1.0",
+    "@supabase/supabase-js": "^2.45.0",
+    "expo": "~52.0.0",
+    "expo-crypto": "~14.0.1",
+    "expo-router": "~4.0.0",
+    "expo-sqlite": "~15.0.3",
+    "react": "18.3.1",
+    "react-native": "0.76.5",
+    "react-native-url-polyfill": "^2.0.0"
+  },
+  "devDependencies": {
+    "typescript": "~5.3.3",
+    "@types/react": "~18.3.12"
+  },
+  "private": true
+}

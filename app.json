@@ -1,0 +1,53 @@
+{
+  "expo": {
+    "name": "Coach",
+    "slug": "coach-app",
+    "version": "0.1.0",
+    "scheme": "coachapp",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.yourcompany.coach",
+      "entitlements": {
+        "com.apple.developer.healthkit": true,
+        "com.apple.developer.healthkit.access": []
+      },
+      "infoPlist": {
+        "NSHealthShareUsageDescription": "Your coach uses your sleep, recovery and nutrition data to adjust your training. We read this data only — we never write to Apple Health.",
+        "NSHealthUpdateUsageDescription": "This app does not write to Apple Health.",
+        "LSApplicationQueriesSchemes": ["myfitnesspal"]
+      }
+    },
+    "android": {
+      "package": "com.yourcompany.coach",
+      "permissions": [
+        "android.permission.health.READ_HEART_RATE_VARIABILITY",
+        "android.permission.health.READ_RESTING_HEART_RATE",
+        "android.permission.health.READ_SLEEP",
+        "android.permission.health.READ_WEIGHT",
+        "android.permission.health.READ_BODY_FAT",
+        "android.permission.health.READ_STEPS",
+        "android.permission.health.READ_ACTIVE_CALORIES_BURNED",
+        "android.permission.health.READ_NUTRITION",
+        "android.permission.health.READ_OXYGEN_SATURATION",
+        "android.permission.health.READ_RESPIRATORY_RATE"
+      ]
+    },
+    "plugins": [
+      "expo-router",
+      "expo-sqlite",
+      [
+        "@kingstinct/react-native-healthkit",
+        {
+          "NSHealthShareUsageDescription": "Your coach uses your sleep, recovery and nutrition data to adjust your training.",
+          "background": true
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
