@@ -7,6 +7,8 @@
  * here — it is not decoration, and nothing else in the app is allowed to be
  * ember or ice.
  */
+import type { TextStyle } from 'react-native';
+
 export const color = {
   ground:      '#101418',  // near-black slate, cool not neutral
   surface:     '#181D23',
@@ -30,13 +32,15 @@ export const space = { xs: 4, sm: 8, md: 16, lg: 24, xl: 40 } as const;
 
 export const radius = { sm: 6, md: 12, lg: 20, pill: 999 } as const;
 
-export const type = {
+// Typed as TextStyle rather than `as const`: React Native's fontVariant is a
+// mutable FontVariant[], so a readonly literal cannot be spread into any style.
+export const type: Record<'data' | 'display' | 'body' | 'label', TextStyle> = {
   // Numerals dominate a logging app, so the data face is tabular by default.
-  data:    { fontFamily: 'RobotoMono_500Medium', fontVariant: ['tabular-nums'] as const },
+  data:    { fontFamily: 'RobotoMono_500Medium', fontVariant: ['tabular-nums'] },
   display: { fontFamily: 'Inter_700Bold' },
   body:    { fontFamily: 'Inter_400Regular' },
   label:   { fontFamily: 'Inter_500Medium', letterSpacing: 0.4 },
-} as const;
+};
 
 export const familyColor = (family: 'training' | 'recovery' | 'passive') =>
   family === 'training' ? color.ember
