@@ -10,11 +10,14 @@ Talks to the same Supabase project as the Lovable trainer console.
 | `src/lib/localdb.ts` | Local SQLite store. **The app reads from here, always.** |
 | `src/lib/outbox.ts` | Durable write queue with idempotent replay and backoff |
 | `src/lib/supabase.ts` | Server client — used only by sync, never by components |
+| `src/lib/health.ts` | HealthKit reads — permissions, recent sync, historical backfill |
 | `src/lib/units.ts` | SI storage, display conversion at render |
 | `src/types/sessions.ts` | The 14 session types and their typed parameters |
 | `src/repositories/sessions.ts` | Offline-first session CRUD + load-balance query |
+| `src/repositories/biometrics.ts` | Offline-first biometric writes, baselines, daily nutrition |
 | `src/theme.ts` | Design tokens |
 | `app/log-recovery.tsx` | Working recovery logging screen |
+| `app/connect-health.tsx` | HealthKit permission + backfill onboarding |
 
 ## Setup
 
@@ -38,7 +41,6 @@ this architecture exists to prevent.
 - Auth + tenant context (screens currently use placeholder IDs)
 - Pull-side sync (`src/lib/sync.ts`) — outbox is push only so far
 - Strength logger
-- HealthKit read + historical backfill
 - Daily check-in and readiness scoring
 - watchOS companion
 
@@ -49,4 +51,3 @@ this architecture exists to prevent.
 3. Network listener that drains the outbox on reconnect + app foreground
 4. Stuck-write UI — surface `getStuckWrites()` rather than dropping data
 5. Strength logger
-6. HealthKit

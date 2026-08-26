@@ -9,7 +9,7 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.yourcompany.coach",
+      "bundleIdentifier": "com.rrsonberg.coach",
       "entitlements": {
         "com.apple.developer.healthkit": true,
         "com.apple.developer.healthkit.access": []
@@ -21,7 +21,7 @@
       }
     },
     "android": {
-      "package": "com.yourcompany.coach",
+      "package": "com.rrsonberg.coach",
       "permissions": [
         "android.permission.health.READ_HEART_RATE_VARIABILITY",
         "android.permission.health.READ_RESTING_HEART_RATE",
