@@ -11,6 +11,7 @@ import { useEffect } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { AuthProvider, useAuth } from '../src/lib/auth';
+import { SyncProvider } from '../src/lib/syncRunner';
 import { color } from '../src/theme';
 
 export default function RootLayout() {
@@ -46,13 +47,18 @@ function AuthGate() {
     );
   }
 
+  // SyncProvider wraps the navigator unconditionally rather than only when
+  // signed in. Swapping it in and out would remount the Stack on every sign-in
+  // and sign-out; it no-ops without an identity instead.
   return (
-    <Stack
-      screenOptions={{
-        headerShown: false,
-        contentStyle: { backgroundColor: color.ground },
-      }}
-    />
+    <SyncProvider>
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          contentStyle: { backgroundColor: color.ground },
+        }}
+      />
+    </SyncProvider>
   );
 }
 

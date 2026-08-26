@@ -11,6 +11,7 @@
   "dependencies": {
     "@kingstinct/react-native-healthkit": "^8.7.2",
     "@react-native-async-storage/async-storage": "^2.1.0",
+    "@react-native-community/netinfo": "11.4.1",
     "@supabase/supabase-js": "^2.45.0",
     "expo": "~52.0.0",
     "expo-crypto": "~14.0.1",

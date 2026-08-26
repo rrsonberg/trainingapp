@@ -12,6 +12,7 @@ Talks to the same Supabase project as the Lovable trainer console.
 | `src/lib/supabase.ts` | Server client — used only by sync, never by components |
 | `src/lib/auth.tsx` | Session + tenant/client identity, resolved from JWT claims |
 | `src/lib/sync.ts` | Pull sync with per-table watermarks; dirty rows are never clobbered |
+| `src/lib/syncRunner.tsx` | When to sync: mount, foreground, reconnect. Single-flight |
 | `src/lib/health.ts` | HealthKit reads — permissions, recent sync, historical backfill |
 | `src/lib/units.ts` | SI storage, display conversion at render |
 | `src/types/sessions.ts` | The 14 session types and their typed parameters |
@@ -21,6 +22,7 @@ Talks to the same Supabase project as the Lovable trainer console.
 | `app/_layout.tsx` | Root layout and redirect-based auth gate |
 | `app/sign-in.tsx` | Email and password sign-in |
 | `app/log-recovery.tsx` | Working recovery logging screen |
+| `app/pending-writes.tsx` | The outbox made visible — stuck writes and retry |
 | `app/connect-health.tsx` | HealthKit permission + backfill onboarding |
 
 ## Setup
@@ -59,6 +61,5 @@ lets the outbox resolve it on push. Clean rows lose to the server on
 
 ## Next commits, in order
 
-1. Network listener that runs `syncNow()` on reconnect + app foreground
-2. Stuck-write UI — surface `getStuckWrites()` rather than dropping data
-3. Strength logger
+1. Strength logger
+2. Daily check-in and readiness scoring

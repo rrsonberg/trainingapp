@@ -10,11 +10,13 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Link } from 'expo-router';
 import { useAuth, useIdentity } from '../src/lib/auth';
+import { useSync } from '../src/lib/syncRunner';
 import { color, radius, space, type as t } from '../src/theme';
 
 export default function HomeScreen() {
   const { signOut } = useAuth();
   const identity = useIdentity();
+  const { pending, online, phase } = useSync();
 
   return (
     <ScrollView style={s.screen} contentContainerStyle={s.content}>
@@ -37,6 +39,23 @@ export default function HomeScreen() {
           <Text style={[s.actionText, s.actionQuietText]}>Connect Apple Health</Text>
         </Pressable>
       </Link>
+
+      {/* Only shown when there is something to say. A permanent "0 pending"
+          badge trains people to ignore the one time it matters. */}
+      {(pending > 0 || !online) && (
+        <Link href="/pending-writes" asChild>
+          <Pressable style={s.status}>
+            <View style={[s.dot, { backgroundColor: online ? color.ice : color.warning }]} />
+            <Text style={s.statusText}>
+              {phase === 'syncing'
+                ? 'Syncing...'
+                : !online
+                  ? `Offline - ${pending} waiting to send`
+                  : `${pending} waiting to send`}
+            </Text>
+          </Pressable>
+        </Link>
+      )}
 
       <Pressable style={s.signOut} onPress={signOut}>
         <Text style={s.signOutText}>Sign out</Text>
@@ -74,6 +93,18 @@ const s = StyleSheet.create({
     borderWidth: 1,
   },
   actionQuietText: { color: color.text },
+
+  status: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.sm,
+    backgroundColor: color.surface,
+    borderRadius: radius.md,
+    paddingHorizontal: space.md,
+    paddingVertical: space.sm,
+  },
+  dot: { width: 8, height: 8, borderRadius: radius.pill },
+  statusText: { ...t.body, color: color.textMuted, fontSize: 13 },
 
   signOut: { marginTop: space.xl, alignItems: 'center', paddingVertical: space.sm },
   signOutText: { ...t.body, color: color.textMuted, fontSize: 14 },

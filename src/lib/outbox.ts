@@ -147,15 +147,45 @@ export async function drainOutbox(): Promise<DrainResult> {
   return { sent, failed, remaining };
 }
 
+export type StuckWrite = {
+  seq: number;
+  table_name: string;
+  client_generated_id: string;
+  operation: OutboxOperation;
+  attempts: number;
+  last_error: string | null;
+  created_at: string;
+};
+
 /** Rows that exhausted retries. Show these to the user; never drop them. */
-export async function getStuckWrites() {
+export async function getStuckWrites(): Promise<StuckWrite[]> {
   const db = await getDb();
-  return db.getAllAsync<{ seq: number; table_name: string; last_error: string }>(
-    `SELECT seq, table_name, last_error
+  return db.getAllAsync<StuckWrite>(
+    `SELECT seq, table_name, client_generated_id, operation, attempts, last_error, created_at
        FROM outbox
+      WHERE attempts >= ?
+      ORDER BY seq ASC`,
+    [MAX_ATTEMPTS]
+  );
+}
+
+/**
+ * Re-arm parked writes so the next drain picks them up again.
+ *
+ * Parking sets next_attempt_at to the year 9999, which is what keeps a
+ * permanently failing row from blocking the queue behind it. Nothing else
+ * clears that, so without this the only route back is reinstalling the app —
+ * and the whole point of parking rather than deleting is that the data is
+ * still recoverable.
+ */
+export async function retryStuckWrites(): Promise<number> {
+  const db = await getDb();
+  const result = await db.runAsync(
+    `UPDATE outbox SET attempts = 0, last_error = NULL, next_attempt_at = NULL
       WHERE attempts >= ?`,
     [MAX_ATTEMPTS]
   );
+  return result.changes;
 }
 
 export async function pendingCount(): Promise<number> {
