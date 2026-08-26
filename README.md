@@ -18,9 +18,11 @@ Talks to the same Supabase project as the Lovable trainer console.
 | `src/types/sessions.ts` | The 14 session types and their typed parameters |
 | `src/repositories/sessions.ts` | Offline-first session CRUD + load-balance query |
 | `src/repositories/biometrics.ts` | Offline-first biometric writes, baselines, daily nutrition |
+| `src/repositories/strength.ts` | Exercises and sets, plus last-time lookup from local data |
 | `src/theme.ts` | Design tokens |
 | `app/_layout.tsx` | Root layout and redirect-based auth gate |
 | `app/sign-in.tsx` | Email and password sign-in |
+| `app/log-strength.tsx` | Strength logger — one tap per set, last week's numbers on screen |
 | `app/log-recovery.tsx` | Working recovery logging screen |
 | `app/pending-writes.tsx` | The outbox made visible — stuck writes and retry |
 | `app/connect-health.tsx` | HealthKit permission + backfill onboarding |
@@ -55,11 +57,10 @@ lets the outbox resolve it on push. Clean rows lose to the server on
 
 ## Not built yet
 
-- Strength logger
 - Daily check-in and readiness scoring
 - watchOS companion
 
 ## Next commits, in order
 
-1. Strength logger
-2. Daily check-in and readiness scoring
+1. Daily check-in and readiness scoring
+2. Real home screen — today's session, readiness, the week's balance

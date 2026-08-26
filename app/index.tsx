@@ -11,7 +11,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Link } from 'expo-router';
 import { useAuth, useIdentity } from '../src/lib/auth';
 import { useSync } from '../src/lib/syncRunner';
-import { color, radius, space, type as t } from '../src/theme';
+import { color, familyColor, radius, space, type as t } from '../src/theme';
 
 export default function HomeScreen() {
   const { signOut } = useAuth();
@@ -27,6 +27,12 @@ export default function HomeScreen() {
         <Text style={s.cardLabel}>SIGNED IN AS</Text>
         <Text style={s.cardValue}>{identity.email ?? identity.clientId}</Text>
       </View>
+
+      <Link href="/log-strength" asChild>
+        <Pressable style={[s.action, s.actionTraining]}>
+          <Text style={s.actionText}>Start a strength workout</Text>
+        </Pressable>
+      </Link>
 
       <Link href="/log-recovery" asChild>
         <Pressable style={s.action}>
@@ -87,6 +93,9 @@ const s = StyleSheet.create({
     alignItems: 'center',
   },
   actionText: { ...t.label, color: color.ground, fontSize: 16 },
+  // Training reads ember, recovery reads ice. theme.ts is emphatic that colour
+  // carries meaning here, so the two entry points must not look alike.
+  actionTraining: { backgroundColor: familyColor('training') },
   actionQuiet: {
     backgroundColor: 'transparent',
     borderColor: color.line,
