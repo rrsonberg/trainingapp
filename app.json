@@ -17,7 +17,9 @@
       "infoPlist": {
         "NSHealthShareUsageDescription": "Your coach uses your sleep, recovery and nutrition data to adjust your training. We read this data only — we never write to Apple Health.",
         "NSHealthUpdateUsageDescription": "This app does not write to Apple Health.",
-        "LSApplicationQueriesSchemes": ["myfitnesspal"]
+        "LSApplicationQueriesSchemes": [
+          "myfitnesspal"
+        ]
       }
     },
     "android": {
@@ -44,7 +46,8 @@
           "NSHealthShareUsageDescription": "Your coach uses your sleep, recovery and nutrition data to adjust your training.",
           "background": true
         }
-      ]
+      ],
+      "expo-asset"
     ],
     "experiments": {
       "typedRoutes": true
