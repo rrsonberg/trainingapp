@@ -11,6 +11,7 @@ Talks to the same Supabase project as the Lovable trainer console.
 | `src/lib/outbox.ts` | Durable write queue with idempotent replay and backoff |
 | `src/lib/supabase.ts` | Server client — used only by sync, never by components |
 | `src/lib/auth.tsx` | Session + tenant/client identity, resolved from JWT claims |
+| `src/lib/sync.ts` | Pull sync with per-table watermarks; dirty rows are never clobbered |
 | `src/lib/health.ts` | HealthKit reads — permissions, recent sync, historical backfill |
 | `src/lib/units.ts` | SI storage, display conversion at render |
 | `src/types/sessions.ts` | The 14 session types and their typed parameters |
@@ -45,16 +46,19 @@ repositories write to SQLite and enqueue, the outbox syncs. If a screen awaits
 the network to show or accept data, you have reintroduced the exact defect
 this architecture exists to prevent.
 
+The corollary on the read side: **a pull never overwrites a dirty row.** A dirty
+row is a write the user made that has not reached the server. Sync skips it and
+lets the outbox resolve it on push. Clean rows lose to the server on
+`updated_at`.
+
 ## Not built yet
 
-- Pull-side sync (`src/lib/sync.ts`) — outbox is push only so far
 - Strength logger
 - Daily check-in and readiness scoring
 - watchOS companion
 
 ## Next commits, in order
 
-1. Pull sync with `last_pulled_at` watermarks per table
-2. Network listener that drains the outbox on reconnect + app foreground
-3. Stuck-write UI — surface `getStuckWrites()` rather than dropping data
-4. Strength logger
+1. Network listener that runs `syncNow()` on reconnect + app foreground
+2. Stuck-write UI — surface `getStuckWrites()` rather than dropping data
+3. Strength logger
