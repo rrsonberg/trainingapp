@@ -17,13 +17,13 @@
 import { useCallback, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Link, useFocusEffect } from 'expo-router';
-import { useAuth, useIdentity } from '../src/lib/auth';
-import { useSync } from '../src/lib/syncRunner';
-import { listSessions, loadBalance } from '../src/repositories/sessions';
-import { SESSION_TYPES, type Session } from '../src/types/sessions';
-import { BAND_COPY, computeReadiness, type Readiness } from '../src/lib/readiness';
-import { displayDuration } from '../src/lib/units';
-import { color, familyColor, radius, space, type as t } from '../src/theme';
+import { useAuth, useIdentity } from '../../src/lib/auth';
+import { useSync } from '../../src/lib/syncRunner';
+import { listSessions, loadBalance } from '../../src/repositories/sessions';
+import { SESSION_TYPES, type Session } from '../../src/types/sessions';
+import { BAND_COPY, computeReadiness, type Readiness } from '../../src/lib/readiness';
+import { displayDuration } from '../../src/lib/units';
+import { color, familyColor, radius, space, type as t } from '../../src/theme';
 
 const TRAINING = familyColor('training');
 const RECOVERY = familyColor('recovery');

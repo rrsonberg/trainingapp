@@ -14,9 +14,9 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View,
 } from 'react-native';
-import { getStuckWrites, retryStuckWrites, type StuckWrite } from '../src/lib/outbox';
-import { useSync } from '../src/lib/syncRunner';
-import { color, radius, space, type as t } from '../src/theme';
+import { getStuckWrites, retryStuckWrites, type StuckWrite } from '../../src/lib/outbox';
+import { useSync } from '../../src/lib/syncRunner';
+import { color, radius, space, type as t } from '../../src/theme';
 
 function ago(iso: string): string {
   const ms = Date.now() - new Date(iso).getTime();

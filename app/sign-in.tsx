@@ -12,11 +12,12 @@ import {
   ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView,
   StyleSheet, Text, TextInput, View,
 } from 'react-native';
+import { Redirect } from 'expo-router';
 import { useAuth } from '../src/lib/auth';
 import { color, radius, space, type as t } from '../src/theme';
 
 export default function SignInScreen() {
-  const { signIn, error } = useAuth();
+  const { signIn, error, status } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
@@ -38,6 +39,10 @@ export default function SignInScreen() {
       setBusy(false);
     }
   }
+
+  // The counterpart to the gate in (app)/_layout: once signed in, this screen
+  // must get out of the way during render rather than after it.
+  if (status === 'signedIn') return <Redirect href="/" />;
 
   const shown = localError ?? error;
 

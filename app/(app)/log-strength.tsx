@@ -20,14 +20,14 @@ import {
   ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
 } from 'react-native';
 import { router } from 'expo-router';
-import { useIdentity } from '../src/lib/auth';
-import { createSession, startSession, completeSession } from '../src/repositories/sessions';
+import { useIdentity } from '../../src/lib/auth';
+import { createSession, startSession, completeSession } from '../../src/repositories/sessions';
 import {
   addExercise, deleteSet, lastPerformance, listSessionExercises, logSet,
   searchExercises, sessionVolume,
   type Exercise, type LastPerformance, type LoggedExercise,
-} from '../src/repositories/strength';
-import { color, familyColor, radius, space, type as t } from '../src/theme';
+} from '../../src/repositories/strength';
+import { color, familyColor, radius, space, type as t } from '../../src/theme';
 
 const ACCENT = familyColor('training');
 

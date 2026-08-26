@@ -15,11 +15,11 @@ import {
   Pressable, ScrollView, StyleSheet, Text, TextInput, View,
 } from 'react-native';
 import { router } from 'expo-router';
-import { SESSION_TYPES, type SessionTypeKey } from '../src/types/sessions';
-import { createSession, completeSession } from '../src/repositories/sessions';
-import { useIdentity } from '../src/lib/auth';
-import { color, radius, space, type as t } from '../src/theme';
-import { fToC, displayDuration } from '../src/lib/units';
+import { SESSION_TYPES, type SessionTypeKey } from '../../src/types/sessions';
+import { createSession, completeSession } from '../../src/repositories/sessions';
+import { useIdentity } from '../../src/lib/auth';
+import { color, radius, space, type as t } from '../../src/theme';
+import { fToC, displayDuration } from '../../src/lib/units';
 
 const RECOVERY_TYPES = Object.values(SESSION_TYPES)
   .filter((d) => d.family === 'recovery')

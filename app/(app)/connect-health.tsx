@@ -13,9 +13,9 @@ import {
   requestHealthPermissions,
   backfillHealthHistory,
   isHealthAvailable,
-} from '../src/lib/health';
-import { useIdentity } from '../src/lib/auth';
-import { color, radius, space, type as t } from '../src/theme';
+} from '../../src/lib/health';
+import { useIdentity } from '../../src/lib/auth';
+import { color, radius, space, type as t } from '../../src/theme';
 
 type Stage = 'intro' | 'requesting' | 'backfilling' | 'done' | 'unavailable';
 

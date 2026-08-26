@@ -15,10 +15,10 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
 } from 'react-native';
-import { useIdentity } from '../src/lib/auth';
-import { checkinForDay, saveCheckin, today } from '../src/repositories/checkins';
-import { BAND_COPY, computeReadiness, type Readiness } from '../src/lib/readiness';
-import { color, radius, space, type as t } from '../src/theme';
+import { useIdentity } from '../../src/lib/auth';
+import { checkinForDay, saveCheckin, today } from '../../src/repositories/checkins';
+import { BAND_COPY, computeReadiness, type Readiness } from '../../src/lib/readiness';
+import { color, radius, space, type as t } from '../../src/theme';
 
 const SCALES = [
   { key: 'energy', label: 'Energy', low: 'Drained', high: 'Fresh' },

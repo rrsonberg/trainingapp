@@ -1,72 +1,43 @@
 /**
- * Root layout and auth gate.
+ * Root layout.
  *
- * The gate redirects rather than unmounting the navigator, so a signed-in
- * client never watches the app tear itself down and rebuild. The loading state
- * is deliberately plain and deliberately brief — identity resolves from cache
- * before the session read finishes, so this rarely renders for more than a frame.
+ * It renders a navigator on the FIRST render and does nothing else. That is not
+ * a style preference — expo-router throws "Attempted to navigate before
+ * mounting the Root Layout component" if the root ever returns something that
+ * is not a navigator, which is what happens if you try to gate auth here behind
+ * a loading spinner.
+ *
+ * The auth gate therefore lives one level down, in app/(app)/_layout.tsx, where
+ * it can redirect during render instead of in an effect. The route group adds
+ * no path segment, so every href stays exactly what it was.
+ *
+ * The safe-area inset is applied here, around the whole navigator, rather than
+ * in each screen. Every screen is a full-bleed dark surface with no header, so
+ * they all need the same inset, and doing it per screen means the first one
+ * anybody forgets renders its title underneath the clock.
  */
 
-import { useEffect } from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
-import { Stack, useRouter, useSegments } from 'expo-router';
-import { AuthProvider, useAuth } from '../src/lib/auth';
-import { SyncProvider } from '../src/lib/syncRunner';
+import { Slot } from 'expo-router';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
+import { StyleSheet } from 'react-native';
+import { AuthProvider } from '../src/lib/auth';
 import { color } from '../src/theme';
 
 export default function RootLayout() {
   return (
-    <AuthProvider>
-      <AuthGate />
-    </AuthProvider>
-  );
-}
-
-function AuthGate() {
-  const { status } = useAuth();
-  const segments = useSegments();
-  const router = useRouter();
-
-  useEffect(() => {
-    if (status === 'loading') return;
-
-    const onSignIn = segments[0] === 'sign-in';
-
-    if (status === 'signedOut' && !onSignIn) {
-      router.replace('/sign-in');
-    } else if (status === 'signedIn' && onSignIn) {
-      router.replace('/');
-    }
-  }, [status, segments, router]);
-
-  if (status === 'loading') {
-    return (
-      <View style={s.boot}>
-        <ActivityIndicator color={color.ice} />
-      </View>
-    );
-  }
-
-  // SyncProvider wraps the navigator unconditionally rather than only when
-  // signed in. Swapping it in and out would remount the Stack on every sign-in
-  // and sign-out; it no-ops without an identity instead.
-  return (
-    <SyncProvider>
-      <Stack
-        screenOptions={{
-          headerShown: false,
-          contentStyle: { backgroundColor: color.ground },
-        }}
-      />
-    </SyncProvider>
+    <SafeAreaProvider>
+      {/* The whole app is a dark surface, so the system bars must be light. */}
+      <StatusBar style="light" />
+      <SafeAreaView style={s.safe} edges={['top', 'left', 'right']}>
+        <AuthProvider>
+          <Slot />
+        </AuthProvider>
+      </SafeAreaView>
+    </SafeAreaProvider>
   );
 }
 
 const s = StyleSheet.create({
-  boot: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: color.ground,
-  },
+  safe: { flex: 1, backgroundColor: color.ground },
 });
