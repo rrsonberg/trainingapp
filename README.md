@@ -26,6 +26,7 @@ Talks to the same Supabase project as the Lovable trainer console.
 | `src/lib/__tests__/` | Jest, on the pure modules — the ones that fail silently |
 | `app/_layout.tsx` | Root layout and redirect-based auth gate |
 | `app/sign-in.tsx` | Email and password sign-in |
+| `app/index.tsx` | Home — readiness, today, and the week's training/recovery balance |
 | `app/check-in.tsx` | Daily check-in and the readiness score it produces |
 | `app/log-strength.tsx` | Strength logger — one tap per set, last week's numbers on screen |
 | `app/log-recovery.tsx` | Working recovery logging screen |
@@ -76,4 +77,5 @@ someone to train through something they should have respected.
 
 ## Next commits, in order
 
-1. Real home screen — today's session, readiness, the week's balance
+1. Planned sessions — a coach assigns, the client sees it under Today. Everything
+   the client logs works; nothing yet arrives *from* the trainer console.
