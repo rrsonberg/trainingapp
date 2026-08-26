@@ -6,18 +6,26 @@
  * write is keyed by — and have it ready on a cold launch with no network,
  * because clients open this app in gym basements.
  *
- * Identity comes from JWT claims, not a lookup query. The claims are set
- * server-side and travel inside the token, so a persisted session already
- * carries the tenant. A `select` against a clients table would put the network
- * on the launch path, which is the exact defect the rest of this codebase is
- * built to avoid.
+ * Identity resolves in two steps, cheapest first.
  *
- * If your backend puts the claims somewhere else, `identityFromUser` below is
- * the only function that has to change.
+ * 1. JWT claims, if the backend provisions them. Free and offline.
+ * 2. Otherwise a `memberships` lookup — profile_id = auth.uid(), role 'client',
+ *    status 'active' — which is the shape the trainer console already uses and
+ *    the only one that works against the deployed schema. Verified: zero of the
+ *    fifteen accounts carry a tenant claim, and all fifteen have a membership.
+ *
+ * The lookup costs one round trip, so it runs ONLY when the cache is empty —
+ * which in practice means at sign-in, where the network is required anyway. A
+ * cold launch reads the cached identity and never touches the network, which is
+ * what keeps the launch path clear of the defect this codebase exists to avoid.
+ *
+ * A network failure during the lookup is NOT treated as "no membership". The
+ * former is temporary and must not sign anyone out; only an authoritative empty
+ * result refuses.
  */
 
 import {
-  createContext, useCallback, useContext, useEffect, useState, type ReactNode,
+  createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode,
 } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Session, User } from '@supabase/supabase-js';
@@ -49,33 +57,84 @@ function str(v: unknown): string | null {
 }
 
 /**
- * Pull tenant and client out of the token.
+ * Step 1 — tenant straight out of the token, when it is there.
  *
- * `app_metadata` is checked first because it is the half of the token a user
- * cannot edit — `user_metadata` is writable by the account holder, so trusting
- * it for a tenant id would let one client write rows into another's tenant.
- * It is read only as a fallback for dev projects that provision there.
- *
- * `client_id` falls back to the auth uid, which is correct for schemas that key
- * the clients table on it. `tenant_id` has no fallback on purpose: a write with
- * a guessed tenant is worse than a write that never happens.
+ * `app_metadata` only. `user_metadata` is writable by the account holder, so
+ * trusting it for a tenant id would let one client write rows into another's
+ * tenant. `client_id` falls back to the auth uid, which is correct here:
+ * profiles.id IS the auth uid, and sessions.client_id references profiles.id.
  */
 export function identityFromUser(user: User): Identity | null {
   const app = (user.app_metadata ?? {}) as Record<string, unknown>;
-  const meta = (user.user_metadata ?? {}) as Record<string, unknown>;
 
-  const tenantId = str(app.tenant_id) ?? str(meta.tenant_id);
+  const tenantId = str(app.tenant_id);
   if (!tenantId) return null;
 
-  const clientId = str(app.client_id) ?? str(meta.client_id) ?? user.id;
+  return {
+    userId: user.id,
+    tenantId,
+    clientId: str(app.client_id) ?? user.id,
+    email: user.email ?? null,
+  };
+}
 
-  return { userId: user.id, tenantId, clientId, email: user.email ?? null };
+/** Distinguishes "this account has no tenant" from "the network is down". */
+type Resolution =
+  | { kind: 'identity'; identity: Identity }
+  | { kind: 'noTenant' }
+  | { kind: 'unavailable' };
+
+/**
+ * Step 2 — the membership lookup.
+ *
+ * One row, one round trip, and only when nothing is cached. `.limit(1)` with a
+ * stable order rather than `.single()`: a client belonging to two tenants is a
+ * data question, not a reason to refuse them entry to the app.
+ */
+async function identityFromMembership(user: User): Promise<Resolution> {
+  const { data, error } = await supabase
+    .from('memberships')
+    .select('tenant_id')
+    .eq('profile_id', user.id)
+    .eq('role', 'client')
+    .eq('status', 'active')
+    .is('deleted_at', null)
+    .order('created_at', { ascending: true })
+    .limit(1);
+
+  // An error here is transport, not verdict. Saying "no tenant" on a dropped
+  // connection would sign out a client standing in a gym with bad signal.
+  if (error) return { kind: 'unavailable' };
+
+  const tenantId = str(data?.[0]?.tenant_id);
+  if (!tenantId) return { kind: 'noTenant' };
+
+  return {
+    kind: 'identity',
+    identity: {
+      userId: user.id,
+      tenantId,
+      clientId: user.id,
+      email: user.email ?? null,
+    },
+  };
+}
+
+async function resolveIdentity(user: User): Promise<Resolution> {
+  const claimed = identityFromUser(user);
+  if (claimed) return { kind: 'identity', identity: claimed };
+  return identityFromMembership(user);
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<AuthStatus>('loading');
   const [identity, setIdentity] = useState<Identity | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Read inside apply() without making it a dependency — apply is wired to
+  // onAuthStateChange, and re-subscribing on every identity change would churn.
+  const identityRef = useRef<Identity | null>(null);
+  identityRef.current = identity;
 
   const apply = useCallback(async (session: Session | null) => {
     if (!session?.user) {
@@ -85,12 +144,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    const next = identityFromUser(session.user);
+    const resolved = await resolveIdentity(session.user);
 
-    if (!next) {
-      // Authenticated, but the account carries no tenant claim. Refusing here
-      // is deliberate: letting them in would produce sessions and biometrics
-      // that belong to nobody and cannot be repaired after the fact.
+    if (resolved.kind === 'noTenant') {
+      // Authenticated, but linked to no tenant. Refusing is deliberate: letting
+      // them in would produce sessions and biometrics that belong to nobody and
+      // cannot be repaired after the fact.
       setError(
         'This account is not linked to a coach yet. Ask your coach to finish setting it up.'
       );
@@ -101,10 +160,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    if (resolved.kind === 'unavailable') {
+      // Could not ask. Keep whatever we already had — a cached identity from a
+      // previous launch stays valid, and a fresh sign-in simply reports that it
+      // could not finish rather than pretending the account is unlinked.
+      if (!identityRef.current) {
+        setError('Could not reach your coach\u2019s workspace. Check your connection and try again.');
+        setStatus('signedOut');
+      }
+      return;
+    }
+
     setError(null);
-    setIdentity(next);
+    setIdentity(resolved.identity);
     setStatus('signedIn');
-    await AsyncStorage.setItem(IDENTITY_KEY, JSON.stringify(next));
+    await AsyncStorage.setItem(IDENTITY_KEY, JSON.stringify(resolved.identity));
   }, []);
 
   useEffect(() => {

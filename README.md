@@ -48,11 +48,18 @@ npm test
 
 Requires `schema.sql` already deployed to the Supabase project.
 
-Sign-in expects each account's JWT to carry a `tenant_id` claim (and optionally
-`client_id`) in **`app_metadata`** — set it server-side when a coach creates the
-client. Without it the app refuses the session rather than writing rows that
-belong to no tenant. If your backend stores identity elsewhere, change
-`identityFromUser` in `src/lib/auth.tsx`; nothing else reads those claims.
+Identity resolves from the `memberships` table — `profile_id = auth.uid()`,
+role `client`, status `active` — which is the same mechanism the trainer console
+uses. `profiles.id` IS the auth uid, and `sessions.client_id` references
+`profiles.id`, so the client id needs no lookup of its own.
+
+A `tenant_id` claim in **`app_metadata`** short-circuits that lookup if you ever
+provision one. Either way the resolved identity is cached, so the query runs at
+sign-in and never on a cold launch.
+
+An account with no active client membership is refused rather than allowed to
+write rows belonging to no tenant. A *network failure* during the lookup is not
+treated the same way — it keeps whatever identity was already cached.
 
 ## The one rule
 
