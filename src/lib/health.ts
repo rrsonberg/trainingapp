@@ -21,12 +21,50 @@
  */
 
 import { Platform } from 'react-native';
-import HealthKit, {
+import type {
   HKQuantityTypeIdentifier,
-  HKCategoryTypeIdentifier,
   HKUnit,
 } from '@kingstinct/react-native-healthkit';
 import { saveBiometric } from '../repositories/biometrics';
+
+type HealthKitModule = typeof import('@kingstinct/react-native-healthkit');
+
+type LoadedHealthKit = {
+  HealthKit: HealthKitModule['default'];
+  quantityIds: HealthKitModule['HKQuantityTypeIdentifier'];
+  categoryIds: HealthKitModule['HKCategoryTypeIdentifier'];
+};
+
+let loaded: LoadedHealthKit | null | undefined;
+
+/**
+ * Load the native module, or null where it does not exist.
+ *
+ * The header above already says HealthKit is absent in Expo Go — but the metric
+ * table below used to be built from the native enum at IMPORT time, so merely
+ * importing this file crashed anywhere the native side was missing, taking the
+ * whole app down rather than one screen. Requiring it lazily keeps the app
+ * loadable everywhere and confines the absence to the feature that needs it.
+ */
+function loadHealthKit(): LoadedHealthKit | null {
+  if (loaded !== undefined) return loaded;
+  if (Platform.OS !== 'ios') return (loaded = null);
+
+  try {
+    const mod = require('@kingstinct/react-native-healthkit') as HealthKitModule;
+    loaded = mod?.default
+      ? {
+          HealthKit: mod.default,
+          quantityIds: mod.HKQuantityTypeIdentifier,
+          categoryIds: mod.HKCategoryTypeIdentifier,
+        }
+      : null;
+  } catch {
+    // Expo Go, or a build where the pod was never linked.
+    loaded = null;
+  }
+  return loaded;
+}
 
 export type MetricKey =
   | 'hrv_ms' | 'resting_hr' | 'sleep_seconds' | 'respiratory_rate' | 'spo2'
@@ -47,33 +85,48 @@ type QuantityMap = {
  * is another switch in the permission sheet the user can decline, and a longer
  * privacy label at App Store submission.
  */
-export const QUANTITY_METRICS: QuantityMap[] = [
+let metricsCache: QuantityMap[] | null = null;
+
+export function quantityMetrics(hk: LoadedHealthKit): QuantityMap[] {
+  if (metricsCache) return metricsCache;
+  const Q = hk.quantityIds;
+  metricsCache = [
   // Readiness
-  { metric: 'hrv_ms',            identifier: HKQuantityTypeIdentifier.heartRateVariabilitySDNN, unit: 'ms',      aggregate: 'average' },
-  { metric: 'resting_hr',        identifier: HKQuantityTypeIdentifier.restingHeartRate,         unit: 'count/min', aggregate: 'average' },
-  { metric: 'respiratory_rate',  identifier: HKQuantityTypeIdentifier.respiratoryRate,          unit: 'count/min', aggregate: 'average' },
-  { metric: 'spo2',              identifier: HKQuantityTypeIdentifier.oxygenSaturation,         unit: '%',       aggregate: 'average' },
+  { metric: 'hrv_ms',            identifier: Q.heartRateVariabilitySDNN, unit: 'ms',      aggregate: 'average' },
+  { metric: 'resting_hr',        identifier: Q.restingHeartRate,         unit: 'count/min', aggregate: 'average' },
+  { metric: 'respiratory_rate',  identifier: Q.respiratoryRate,          unit: 'count/min', aggregate: 'average' },
+  { metric: 'spo2',              identifier: Q.oxygenSaturation,         unit: '%',       aggregate: 'average' },
 
   // Body
-  { metric: 'body_weight_kg',    identifier: HKQuantityTypeIdentifier.bodyMass,                 unit: 'kg',      aggregate: 'latest' },
-  { metric: 'body_fat_pct',      identifier: HKQuantityTypeIdentifier.bodyFatPercentage,        unit: '%',       aggregate: 'latest' },
+  { metric: 'body_weight_kg',    identifier: Q.bodyMass,                 unit: 'kg',      aggregate: 'latest' },
+  { metric: 'body_fat_pct',      identifier: Q.bodyFatPercentage,        unit: '%',       aggregate: 'latest' },
 
   // Activity
-  { metric: 'steps',             identifier: HKQuantityTypeIdentifier.stepCount,                unit: 'count',   aggregate: 'sum' },
-  { metric: 'active_energy_kj',  identifier: HKQuantityTypeIdentifier.activeEnergyBurned,       unit: 'kJ',      aggregate: 'sum' },
+  { metric: 'steps',             identifier: Q.stepCount,                unit: 'count',   aggregate: 'sum' },
+  { metric: 'active_energy_kj',  identifier: Q.activeEnergyBurned,       unit: 'kJ',      aggregate: 'sum' },
 
   // Nutrition — this is the MyFitnessPal data.
   // NOTE: HealthKit gives DAILY TOTALS, not individual food entries. You get
   // "2140 kcal / 180g protein on Tuesday", never "chicken and rice at 1pm".
-  { metric: 'dietary_energy_kj',  identifier: HKQuantityTypeIdentifier.dietaryEnergyConsumed,   unit: 'kJ',      aggregate: 'sum' },
-  { metric: 'dietary_protein_g',  identifier: HKQuantityTypeIdentifier.dietaryProtein,          unit: 'g',       aggregate: 'sum' },
-  { metric: 'dietary_carbs_g',    identifier: HKQuantityTypeIdentifier.dietaryCarbohydrates,    unit: 'g',       aggregate: 'sum' },
-  { metric: 'dietary_fat_g',      identifier: HKQuantityTypeIdentifier.dietaryFatTotal,         unit: 'g',       aggregate: 'sum' },
-  { metric: 'dietary_water_ml',   identifier: HKQuantityTypeIdentifier.dietaryWater,            unit: 'ml',      aggregate: 'sum' },
-];
+  { metric: 'dietary_energy_kj',  identifier: Q.dietaryEnergyConsumed,   unit: 'kJ',      aggregate: 'sum' },
+  { metric: 'dietary_protein_g',  identifier: Q.dietaryProtein,          unit: 'g',       aggregate: 'sum' },
+  { metric: 'dietary_carbs_g',    identifier: Q.dietaryCarbohydrates,    unit: 'g',       aggregate: 'sum' },
+  { metric: 'dietary_fat_g',      identifier: Q.dietaryFatTotal,         unit: 'g',       aggregate: 'sum' },
+  { metric: 'dietary_water_ml',   identifier: Q.dietaryWater,            unit: 'ml',      aggregate: 'sum' },
+  ];
+  return metricsCache;
+}
 
+/**
+ * Truthfully: is there a Health source we can actually read?
+ *
+ * This used to answer true on Android on the strength of the Health Connect
+ * permissions in app.json — but nothing reads Health Connect yet, so the screen
+ * promised a connection and then silently did nothing. It now reports what is
+ * really wired up.
+ */
 export function isHealthAvailable() {
-  return Platform.OS === 'ios' || Platform.OS === 'android';
+  return loadHealthKit() !== null;
 }
 
 /**
@@ -83,15 +136,16 @@ export function isHealthAvailable() {
  * access". There is no way to know the latter. Treat it accordingly.
  */
 export async function requestHealthPermissions(): Promise<boolean> {
-  if (Platform.OS !== 'ios') return false;
+  const hk = loadHealthKit();
+  if (!hk) return false;
 
-  const available = await HealthKit.isHealthDataAvailable();
+  const available = await hk.HealthKit.isHealthDataAvailable();
   if (!available) return false;
 
-  await HealthKit.requestAuthorization(
+  await hk.HealthKit.requestAuthorization(
     [
-      ...QUANTITY_METRICS.map((m) => m.identifier),
-      HKCategoryTypeIdentifier.sleepAnalysis,
+      ...quantityMetrics(hk).map((m) => m.identifier),
+      hk.categoryIds.sleepAnalysis,
     ],
     [] // we request READ only. We write nothing back to Health.
   );
@@ -107,12 +161,13 @@ function dayKey(d: Date) {
  * Pull one metric across a date range and write daily values locally.
  */
 async function syncQuantityMetric(
+  hk: LoadedHealthKit,
   map: QuantityMap,
   clientId: string,
   from: Date,
   to: Date
 ): Promise<number> {
-  const samples = await HealthKit.queryQuantitySamples(map.identifier, {
+  const samples = await hk.HealthKit.queryQuantitySamples(map.identifier, {
     from,
     to,
     unit: map.unit as HKUnit,
@@ -152,9 +207,9 @@ async function syncQuantityMetric(
   return written;
 }
 
-async function syncSleep(clientId: string, from: Date, to: Date) {
-  const samples = await HealthKit.queryCategorySamples(
-    HKCategoryTypeIdentifier.sleepAnalysis,
+async function syncSleep(hk: LoadedHealthKit, clientId: string, from: Date, to: Date) {
+  const samples = await hk.HealthKit.queryCategorySamples(
+    hk.categoryIds.sleepAnalysis,
     { from, to }
   );
   if (!samples?.length) return 0;
@@ -196,17 +251,21 @@ export async function backfillHealthHistory(
   years = 2,
   onProgress?: (done: number, total: number) => void
 ) {
+  const hk = loadHealthKit();
+  if (!hk) return 0;
+
   const to = new Date();
   const from = new Date();
   from.setFullYear(from.getFullYear() - years);
 
-  const total = QUANTITY_METRICS.length + 1;
+  const metrics = quantityMetrics(hk);
+  const total = metrics.length + 1;
   let done = 0;
   let rows = 0;
 
-  for (const map of QUANTITY_METRICS) {
+  for (const map of metrics) {
     try {
-      rows += await syncQuantityMetric(map, clientId, from, to);
+      rows += await syncQuantityMetric(hk, map, clientId, from, to);
     } catch {
       // One unavailable metric must never abort the whole backfill.
       // A denied type is indistinguishable from an empty one — keep going.
@@ -215,7 +274,7 @@ export async function backfillHealthHistory(
   }
 
   try {
-    rows += await syncSleep(clientId, from, to);
+    rows += await syncSleep(hk, clientId, from, to);
   } catch {}
   onProgress?.(++done, total);
 
@@ -224,17 +283,20 @@ export async function backfillHealthHistory(
 
 /** Incremental sync — run on app foreground. Cheap; last 7 days only. */
 export async function syncRecentHealth(clientId: string) {
+  const hk = loadHealthKit();
+  if (!hk) return 0;
+
   const to = new Date();
   const from = new Date(Date.now() - 7 * 86_400_000);
 
   let rows = 0;
-  for (const map of QUANTITY_METRICS) {
+  for (const map of quantityMetrics(hk)) {
     try {
-      rows += await syncQuantityMetric(map, clientId, from, to);
+      rows += await syncQuantityMetric(hk, map, clientId, from, to);
     } catch {}
   }
   try {
-    rows += await syncSleep(clientId, from, to);
+    rows += await syncSleep(hk, clientId, from, to);
   } catch {}
 
   return rows;
