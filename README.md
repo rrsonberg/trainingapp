@@ -13,15 +13,19 @@ Talks to the same Supabase project as the Lovable trainer console.
 | `src/lib/auth.tsx` | Session + tenant/client identity, resolved from JWT claims |
 | `src/lib/sync.ts` | Pull sync with per-table watermarks; dirty rows are never clobbered |
 | `src/lib/syncRunner.tsx` | When to sync: mount, foreground, reconnect. Single-flight |
+| `src/lib/readinessMath.ts` | Pure scoring arithmetic — no IO, so it can be tested |
+| `src/lib/readiness.ts` | Readiness from baselines + check-in; returns its components |
 | `src/lib/health.ts` | HealthKit reads — permissions, recent sync, historical backfill |
 | `src/lib/units.ts` | SI storage, display conversion at render |
 | `src/types/sessions.ts` | The 14 session types and their typed parameters |
 | `src/repositories/sessions.ts` | Offline-first session CRUD + load-balance query |
 | `src/repositories/biometrics.ts` | Offline-first biometric writes, baselines, daily nutrition |
 | `src/repositories/strength.ts` | Exercises and sets, plus last-time lookup from local data |
+| `src/repositories/checkins.ts` | One row per day, idempotent on re-save |
 | `src/theme.ts` | Design tokens |
 | `app/_layout.tsx` | Root layout and redirect-based auth gate |
 | `app/sign-in.tsx` | Email and password sign-in |
+| `app/check-in.tsx` | Daily check-in and the readiness score it produces |
 | `app/log-strength.tsx` | Strength logger — one tap per set, last week's numbers on screen |
 | `app/log-recovery.tsx` | Working recovery logging screen |
 | `app/pending-writes.tsx` | The outbox made visible — stuck writes and retry |
@@ -55,12 +59,17 @@ row is a write the user made that has not reached the server. Sync skips it and
 lets the outbox resolve it on push. Clean rows lose to the server on
 `updated_at`.
 
+And on scoring: **never invent a readiness score.** `metricBaseline` refuses
+under fourteen readings; `readinessMath` refuses under 35% signal coverage and
+reports its confidence otherwise. A wrong score is worse than none — it tells
+someone to train through something they should have respected.
+
 ## Not built yet
 
-- Daily check-in and readiness scoring
 - watchOS companion
 
 ## Next commits, in order
 
-1. Daily check-in and readiness scoring
-2. Real home screen — today's session, readiness, the week's balance
+1. Real home screen — today's session, readiness, the week's balance
+2. A test runner. `src/lib/readinessMath.ts` is pure and was verified against 25
+   cases during development, but there is nowhere in this repo to keep them

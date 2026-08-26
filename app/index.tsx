@@ -28,6 +28,12 @@ export default function HomeScreen() {
         <Text style={s.cardValue}>{identity.email ?? identity.clientId}</Text>
       </View>
 
+      <Link href="/check-in" asChild>
+        <Pressable style={[s.action, s.actionQuiet]}>
+          <Text style={[s.actionText, s.actionQuietText]}>Daily check-in</Text>
+        </Pressable>
+      </Link>
+
       <Link href="/log-strength" asChild>
         <Pressable style={[s.action, s.actionTraining]}>
           <Text style={s.actionText}>Start a strength workout</Text>
