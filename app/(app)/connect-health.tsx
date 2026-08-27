@@ -15,6 +15,7 @@ import {
   isHealthAvailable,
 } from '../../src/lib/health';
 import { useIdentity } from '../../src/lib/auth';
+import { BackBar } from '../../src/components/BackBar';
 import { color, radius, space, type as t } from '../../src/theme';
 
 type Stage = 'intro' | 'requesting' | 'backfilling' | 'done' | 'unavailable';
@@ -44,6 +45,7 @@ export default function ConnectHealthScreen() {
 
   return (
     <ScrollView style={s.screen} contentContainerStyle={s.content}>
+      <BackBar />
       <Text style={s.eyebrow}>SETUP</Text>
       <Text style={s.title}>Connect Apple Health</Text>
 

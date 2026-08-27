@@ -27,6 +27,7 @@ import {
   searchExercises, sessionVolume,
   type Exercise, type LastPerformance, type LoggedExercise,
 } from '../../src/repositories/strength';
+import { BackBar } from '../../src/components/BackBar';
 import { color, familyColor, radius, space, type as t } from '../../src/theme';
 
 const ACCENT = familyColor('training');
@@ -133,6 +134,7 @@ export default function LogStrengthScreen() {
 
   return (
     <ScrollView style={s.screen} contentContainerStyle={s.content}>
+      <BackBar />
       <Text style={[s.eyebrow, { color: ACCENT }]}>STRENGTH</Text>
       <Text style={s.title}>Workout</Text>
 
@@ -330,6 +332,7 @@ function ExercisePicker({
       contentContainerStyle={s.content}
       keyboardShouldPersistTaps="handled"
     >
+      <BackBar label="Back to workout" onPress={onCancel} />
       <Text style={[s.eyebrow, { color: ACCENT }]}>ADD</Text>
       <Text style={s.title}>Choose a movement</Text>
 

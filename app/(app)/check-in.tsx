@@ -18,6 +18,7 @@ import {
 import { useIdentity } from '../../src/lib/auth';
 import { checkinForDay, saveCheckin, today } from '../../src/repositories/checkins';
 import { BAND_COPY, computeReadiness, type Readiness } from '../../src/lib/readiness';
+import { BackBar } from '../../src/components/BackBar';
 import { color, radius, space, type as t } from '../../src/theme';
 
 const SCALES = [
@@ -104,6 +105,7 @@ export default function CheckInScreen() {
 
   return (
     <ScrollView style={s.screen} contentContainerStyle={s.content}>
+      <BackBar />
       <Text style={s.eyebrow}>TODAY</Text>
       <Text style={s.title}>Check in</Text>
       <Text style={s.body}>3 means normal for you — not average for anyone else.</Text>

@@ -26,6 +26,7 @@ import {
 } from '../../src/repositories/nutrition';
 import { searchFoods, kjToKcal, type FoodResult } from '../../src/lib/foodApi';
 import { today } from '../../src/lib/day';
+import { BackBar } from '../../src/components/BackBar';
 import { color, radius, space, type as t } from '../../src/theme';
 
 const SLOTS: { key: MealSlot; label: string }[] = [
@@ -135,6 +136,7 @@ export default function LogFoodScreen() {
 
   return (
     <ScrollView style={s.screen} contentContainerStyle={s.content}>
+      <BackBar />
       <Text style={s.eyebrow}>FOOD</Text>
       <Text style={s.title}>Log</Text>
 

@@ -18,6 +18,7 @@ import { router } from 'expo-router';
 import { SESSION_TYPES, type SessionTypeKey } from '../../src/types/sessions';
 import { createSession, completeSession } from '../../src/repositories/sessions';
 import { useIdentity } from '../../src/lib/auth';
+import { BackBar } from '../../src/components/BackBar';
 import { color, radius, space, type as t } from '../../src/theme';
 import { fToC, displayDuration } from '../../src/lib/units';
 
@@ -82,6 +83,7 @@ export default function LogRecoveryScreen() {
 
   return (
     <ScrollView style={s.screen} contentContainerStyle={s.content}>
+      <BackBar />
       <Text style={s.eyebrow}>RECOVERY</Text>
       <Text style={s.title}>Log a session</Text>
 

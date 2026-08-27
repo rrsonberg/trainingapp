@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import { getStuckWrites, retryStuckWrites, type StuckWrite } from '../../src/lib/outbox';
 import { useSync } from '../../src/lib/syncRunner';
+import { BackBar } from '../../src/components/BackBar';
 import { color, radius, space, type as t } from '../../src/theme';
 
 function ago(iso: string): string {
@@ -64,6 +65,7 @@ export default function PendingWritesScreen() {
         <RefreshControl refreshing={false} onRefresh={load} tintColor={color.textMuted} />
       }
     >
+      <BackBar />
       <Text style={s.eyebrow}>SYNC</Text>
       <Text style={s.title}>Waiting to send</Text>
 
