@@ -63,6 +63,8 @@ const CONFLICT_TARGET: Record<string, string> = {
   exercise_sets: 'session_exercise_id,client_generated_id',
   biometrics: 'client_id,recorded_on,metric,source',
   daily_checkins: 'client_id,checkin_date',
+  // Matches food_log_entries_cgid_uniq in the food-diary migration.
+  food_log_entries: 'client_id,client_generated_id',
 };
 
 const MAX_ATTEMPTS = 12;

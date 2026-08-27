@@ -97,6 +97,11 @@ export function SyncProvider({ children }: { children: ReactNode }) {
             if (result.push.failed > 0 && result.push.lastError) {
               setPhase('error');
               setLastError(result.push.lastError);
+            } else if (result.pull.failures.length > 0) {
+              // Partial pull. Say so rather than reporting a clean sync over a
+              // table that never came down.
+              setPhase('error');
+              setLastError(result.pull.failures[0]);
             } else {
               setPhase('idle');
             }

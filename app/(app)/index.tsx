@@ -1,8 +1,12 @@
 /**
  * Home.
  *
- * Three questions, in the order a client actually asks them: how am I today,
- * what am I doing, and how has the week balanced out.
+ * Four questions, in the order a client actually asks them: how am I today,
+ * where am I on food, what am I doing, and how has the week balanced out.
+ *
+ * Macros sit directly under readiness because those are the two things checked
+ * daily. Readiness leads because it is the thing no competitor has; food is
+ * second because it is the thing they open the app for.
  *
  * The week strip is the one view the rest of the market does not have
  * (loadBalance, spec I12) and theme.ts is explicit that it must read at a glance
@@ -22,6 +26,7 @@ import { useSync } from '../../src/lib/syncRunner';
 import { listSessions, loadBalance } from '../../src/repositories/sessions';
 import { SESSION_TYPES, type Session } from '../../src/types/sessions';
 import { BAND_COPY, computeReadiness, type Readiness } from '../../src/lib/readiness';
+import { MacroCard } from '../../src/components/MacroCard';
 import { displayDuration } from '../../src/lib/units';
 import { recentDays, today } from '../../src/lib/day';
 import { color, familyColor, radius, space, type as t } from '../../src/theme';
@@ -53,6 +58,7 @@ export default function HomeScreen() {
 
   // Re-read on every focus: coming back from the strength logger should show
   // the session that was just finished, not a stale snapshot.
+  // MacroCard refreshes itself on focus, so it needs nothing here.
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
@@ -113,6 +119,9 @@ export default function HomeScreen() {
             </>
           )}
       </Pressable>
+
+      {/* --- Macros --------------------------------------------------- */}
+      <MacroCard clientId={identity.clientId} />
 
       {/* --- Today's sessions ----------------------------------------- */}
       <Text style={s.section}>Today</Text>

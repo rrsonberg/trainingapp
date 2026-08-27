@@ -114,6 +114,77 @@ CREATE TABLE IF NOT EXISTS daily_checkins (
   dirty               INTEGER NOT NULL DEFAULT 0
 );
 
+/* ---------------------------------------------------------------------------
+ * Food diary.
+ *
+ * Mirrors food_log_entries on the server, minus the columns only the server
+ * needs. The macros are stored ON the entry rather than referenced: if a food
+ * database later corrects a value, what the client logged today must not
+ * silently change next week.
+ *
+ * The two _cache tables are read-only mirrors — targets come down from the
+ * coach, food items come from a lookup. Neither is ever written locally as a
+ * source of truth, so neither carries a dirty flag or an outbox line.
+ * ------------------------------------------------------------------------- */
+CREATE TABLE IF NOT EXISTS food_log_entries (
+  id                  TEXT PRIMARY KEY,
+  client_generated_id TEXT NOT NULL UNIQUE,
+  client_id           TEXT NOT NULL,
+  logged_on           TEXT NOT NULL,
+  meal_slot           TEXT NOT NULL DEFAULT 'unsorted',
+  logged_at           TEXT,
+  food_item_id        TEXT,
+  description         TEXT,
+  quantity            REAL NOT NULL,
+  unit                TEXT NOT NULL DEFAULT 'g',
+  energy_kj           REAL NOT NULL,
+  protein_g           REAL,
+  carbs_g             REAL,
+  fat_g               REAL,
+  fiber_g             REAL,
+  source              TEXT NOT NULL DEFAULT 'manual',
+  updated_at          TEXT NOT NULL,
+  deleted_at          TEXT,
+  dirty               INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_food_entries_day
+  ON food_log_entries (client_id, logged_on) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_food_entries_dirty
+  ON food_log_entries (dirty) WHERE dirty = 1;
+
+CREATE TABLE IF NOT EXISTS nutrition_targets_cache (
+  client_id      TEXT NOT NULL,
+  day_type       TEXT NOT NULL DEFAULT 'standard',
+  effective_from TEXT NOT NULL,
+  energy_kj      REAL NOT NULL,
+  protein_g      REAL,
+  carbs_g        REAL,
+  fat_g          REAL,
+  coach_note     TEXT,
+  PRIMARY KEY (client_id, day_type, effective_from)
+);
+
+CREATE TABLE IF NOT EXISTS food_items_cache (
+  id            TEXT PRIMARY KEY,
+  source        TEXT NOT NULL,
+  source_ref    TEXT,
+  barcode       TEXT,
+  name          TEXT NOT NULL,
+  brand         TEXT,
+  energy_kj     REAL NOT NULL,
+  protein_g     REAL,
+  carbs_g       REAL,
+  fat_g         REAL,
+  fiber_g       REAL,
+  serving_label TEXT,
+  serving_g     REAL,
+  verified      INTEGER NOT NULL DEFAULT 0,
+  last_used_at  TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_food_items_barcode ON food_items_cache (barcode);
+
 /* The outbox. Every local mutation is appended here and replayed in order. */
 CREATE TABLE IF NOT EXISTS outbox (
   seq                 INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -147,6 +218,8 @@ export async function _resetLocalDb() {
   await d.execAsync(`
     DELETE FROM sessions; DELETE FROM session_exercises; DELETE FROM exercise_sets;
     DELETE FROM biometrics; DELETE FROM daily_checkins;
+    DELETE FROM food_log_entries; DELETE FROM food_items_cache;
+    DELETE FROM nutrition_targets_cache;
     DELETE FROM outbox; DELETE FROM sync_state;
   `);
 }

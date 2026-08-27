@@ -47,6 +47,13 @@
           "background": true
         }
       ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Scan barcodes on food packaging to log what you ate. The camera is used only while the scanner is open, and no images are saved or uploaded.",
+          "recordAudioAndroid": false
+        }
+      ],
       "expo-asset"
     ],
     "experiments": {

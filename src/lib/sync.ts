@@ -106,6 +106,18 @@ const TABLES: TableSpec[] = [
     hasDirty: true,
   },
   {
+    table: 'food_log_entries',
+    columns: [
+      'id', 'client_generated_id', 'client_id', 'logged_on', 'meal_slot',
+      'logged_at', 'food_item_id', 'description', 'quantity', 'unit',
+      'energy_kj', 'protein_g', 'carbs_g', 'fat_g', 'fiber_g', 'source',
+      'updated_at', 'deleted_at',
+    ],
+    conflictKey: 'client_generated_id',
+    scopeColumn: 'client_id',
+    hasDirty: true,
+  },
+  {
     table: 'daily_checkins',
     columns: [
       'id', 'client_generated_id', 'client_id', 'checkin_date', 'energy',
@@ -240,18 +252,31 @@ export type PullResult = {
   tables: TablePullResult[];
   received: number;
   skipped: number;
+  /** Tables that could not be pulled at all, with the reason. */
+  failures: string[];
 };
 
 /** Pull every table, in dependency order. */
 export async function pullAll(clientId: string): Promise<PullResult> {
   const tables: TablePullResult[] = [];
+  const failures: string[] = [];
 
   for (const spec of TABLES) {
-    tables.push(await pullTable(spec, clientId));
+    try {
+      tables.push(await pullTable(spec, clientId));
+    } catch (err: any) {
+      // One table must not take the whole pull down with it. A table that does
+      // not exist yet, or one whose policies deny reads, would otherwise mean a
+      // client sees NOTHING sync — sessions included — because of a feature
+      // they have never opened. The watermark is untouched, so the next run
+      // retries the same window.
+      failures.push(`${spec.table}: ${String(err?.message ?? err)}`);
+    }
   }
 
   return {
     tables,
+    failures,
     received: tables.reduce((n, t) => n + t.received, 0),
     skipped: tables.reduce((n, t) => n + t.skipped, 0),
   };
