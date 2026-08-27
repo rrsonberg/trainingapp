@@ -117,14 +117,14 @@ CREATE TABLE IF NOT EXISTS daily_checkins (
 /* ---------------------------------------------------------------------------
  * Food diary.
  *
- * Mirrors food_log_entries on the server, minus the columns only the server
- * needs. The macros are stored ON the entry rather than referenced: if a food
+ * quantity + unit hold what the client actually typed — 6 oz stays 6 oz,
+ * because somebody who weighed their chicken wants their own number back.
+ * grams is the converted figure, stored so the coach can compare portions
+ * across entries without redoing the arithmetic.
+ *
+ * The macros are stored ON the entry rather than referenced: if a food
  * database later corrects a value, what the client logged today must not
  * silently change next week.
- *
- * The two _cache tables are read-only mirrors — targets come down from the
- * coach, food items come from a lookup. Neither is ever written locally as a
- * source of truth, so neither carries a dirty flag or an outbox line.
  * ------------------------------------------------------------------------- */
 CREATE TABLE IF NOT EXISTS food_log_entries (
   id                  TEXT PRIMARY KEY,
@@ -137,6 +137,7 @@ CREATE TABLE IF NOT EXISTS food_log_entries (
   description         TEXT,
   quantity            REAL NOT NULL,
   unit                TEXT NOT NULL DEFAULT 'g',
+  grams               REAL,
   energy_kj           REAL NOT NULL,
   protein_g           REAL,
   carbs_g             REAL,
@@ -205,10 +206,31 @@ CREATE TABLE IF NOT EXISTS sync_state (
 );
 `;
 
+/**
+ * Columns added after a table first shipped.
+ *
+ * CREATE TABLE IF NOT EXISTS does nothing on a device that already has the
+ * table, so a new column needs its own statement. Each is wrapped because
+ * SQLite throws on a duplicate column rather than ignoring it, and a device
+ * that already ran this must not fail to open the database.
+ */
+const ADDITIONS: string[] = [
+  `ALTER TABLE food_log_entries ADD COLUMN grams REAL`,
+];
+
 export async function getDb(): Promise<SQLite.SQLiteDatabase> {
   if (db) return db;
   db = await SQLite.openDatabaseAsync('coach.db');
   await db.execAsync(SCHEMA);
+
+  for (const stmt of ADDITIONS) {
+    try {
+      await db.execAsync(stmt);
+    } catch {
+      // Already present. Expected on every launch after the first.
+    }
+  }
+
   return db;
 }
 

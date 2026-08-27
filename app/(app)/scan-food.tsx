@@ -3,13 +3,14 @@
  *
  * The fastest path to a logged entry, and the one that decides whether a
  * client keeps logging past week two. So it is built around not making them
- * wait: the cache is checked before the network, and a scan that has been seen
- * on this device before resolves with no request at all.
+ * wait: the cache is checked before the network, and a scan seen on this
+ * device before resolves with no request at all.
  *
- * A scan never logs on its own. It resolves the food and shows a confirm step
- * with the portion, because a silent auto-log of the wrong portion is worse
- * than an extra tap — the client has to notice it happened before they can
- * fix it.
+ * A scan never logs on its own. It resolves the food and shows a portion step,
+ * because a silent auto-log of the wrong amount is worse than an extra tap —
+ * the client has to notice it happened before they can fix it. Weight units
+ * lead, since the package goes on the scale more often than it gets eaten
+ * whole.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -19,7 +20,10 @@ import {
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useIdentity } from '../../src/lib/auth';
-import { lookupBarcode, scaleMacros, kjToKcal, type FoodResult } from '../../src/lib/foodApi';
+import {
+  lookupBarcode, scaleMacros, toGrams, kjToKcal, UNIT_LABEL,
+  type FoodResult, type PortionUnit,
+} from '../../src/lib/foodApi';
 import { barcodeFromCache, logFood, type MealSlot } from '../../src/repositories/nutrition';
 import { color, radius, space, type as t } from '../../src/theme';
 
@@ -38,7 +42,7 @@ export default function ScanFoodScreen() {
   const [food, setFood] = useState<FoodResult | null>(null);
   const [scanned, setScanned] = useState<string | null>(null);
   const [amount, setAmount] = useState('');
-  const [unit, setUnit] = useState<'g' | 'serving'>('g');
+  const [unit, setUnit] = useState<PortionUnit>('g');
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -66,16 +70,14 @@ export default function ScanFoodScreen() {
       let result = await barcodeFromCache(code);
       if (!result) result = await lookupBarcode(code);
 
-      if (!result) {
-        setStage('not-found');
-        return;
-      }
+      if (!result) { setStage('not-found'); return; }
 
       setFood(result);
       // Default to the package serving when the source gives one, since that
-      // is what somebody scanning a wrapper almost always ate.
+      // is what somebody scanning a wrapper usually ate. They can switch to
+      // weight in one tap if they portioned it out.
       if (result.servingG) { setUnit('serving'); setAmount('1'); }
-      else { setUnit('g'); setAmount('100'); }
+      else { setUnit('g'); setAmount(''); }
       setStage('confirm');
     } catch (e: any) {
       setError(e?.message ?? 'Lookup failed.');
@@ -133,7 +135,7 @@ export default function ScanFoodScreen() {
           </Pressable>
         ) : (
           <Text style={s.body}>
-            Turn it on in Settings → your app → Camera, then come back.
+            Turn it on in Settings → Coach → Camera, then come back.
           </Text>
         )}
         <Pressable style={s.secondary} onPress={() => router.back()}>
@@ -196,15 +198,23 @@ export default function ScanFoodScreen() {
   // --- Confirm -------------------------------------------------------------
 
   const qty = Number(amount);
-  let preview: { kcal: number; protein: number | null } | null = null;
-  if (food && Number.isFinite(qty) && qty > 0) {
+  const valid = Number.isFinite(qty) && qty > 0;
+
+  let live: { kcal: number; protein: number | null; grams: number } | null = null;
+  if (food && valid) {
     try {
       const m = scaleMacros(food, qty, unit);
-      preview = { kcal: kjToKcal(m.energyKj), protein: m.proteinG };
-    } catch {
-      preview = null;
-    }
+      live = {
+        kcal: kjToKcal(m.energyKj),
+        protein: m.proteinG,
+        grams: toGrams(food, qty, unit),
+      };
+    } catch { live = null; }
   }
+
+  const units: PortionUnit[] = food?.servingG
+    ? ['g', 'oz', 'lb', 'serving']
+    : ['g', 'oz', 'lb'];
 
   return (
     <ScrollView style={s.screen} contentContainerStyle={s.content}>
@@ -213,68 +223,64 @@ export default function ScanFoodScreen() {
       {food?.brand ? <Text style={s.muted}>{food.brand}</Text> : null}
 
       <View style={s.card}>
-        <Text style={s.cardTitle}>How much?</Text>
+        <Text style={s.fieldLabel}>WEIGHED AMOUNT</Text>
+        <TextInput
+          style={s.bigInput}
+          value={amount}
+          onChangeText={(v) => { setAmount(v); setError(null); }}
+          keyboardType="decimal-pad"
+          placeholder="0"
+          placeholderTextColor={color.textMuted}
+          autoFocus
+        />
 
-        <View style={s.row}>
-          <TextInput
-            style={[s.input, { flex: 1 }]}
-            value={amount}
-            onChangeText={(v) => { setAmount(v); setError(null); }}
-            keyboardType="decimal-pad"
-            placeholder="0"
-            placeholderTextColor={color.textMuted}
-          />
-          <View style={s.unitRow}>
-            {food?.servingG ? (
-              <Pressable
-                onPress={() => setUnit('serving')}
-                style={[s.unit, unit === 'serving' && s.unitOn]}
-              >
-                <Text style={[s.unitText, unit === 'serving' && s.unitTextOn]}>
-                  serving
-                </Text>
+        <View style={s.unitRow}>
+          {units.map((u) => {
+            const on = unit === u;
+            return (
+              <Pressable key={u} onPress={() => setUnit(u)} style={[s.unit, on && s.unitOn]}>
+                <Text style={[s.unitText, on && s.unitTextOn]}>{UNIT_LABEL[u]}</Text>
               </Pressable>
-            ) : null}
-            <Pressable
-              onPress={() => setUnit('g')}
-              style={[s.unit, unit === 'g' && s.unitOn]}
-            >
-              <Text style={[s.unitText, unit === 'g' && s.unitTextOn]}>g</Text>
-            </Pressable>
-          </View>
+            );
+          })}
         </View>
 
         {food?.servingLabel ? (
           <Text style={s.muted}>
-            Package serving: {food.servingLabel}
-            {food.servingG ? ` (${food.servingG}g)` : ''}
+            Label serving: {food.servingLabel}
+            {food.servingG ? ` (${food.servingG} g)` : ''}
           </Text>
         ) : null}
-
-        {/* The number before it is committed, so a wrong portion is obvious
-            while it is still one tap to fix. */}
-        {preview && (
-          <Text style={s.preview}>
-            {preview.kcal} kcal
-            {preview.protein != null ? ` · ${Math.round(preview.protein)}g protein` : ''}
-          </Text>
-        )}
-
-        {food?.verified ? (
-          <Text style={s.verified}>USDA data</Text>
-        ) : (
-          <Text style={s.muted}>
-            Crowd-sourced label data — check it against the package if it looks off.
-          </Text>
-        )}
       </View>
+
+      {/* The number before it is committed, so a wrong portion is obvious
+          while it is still one tap to fix. */}
+      {live ? (
+        <View style={s.liveCard}>
+          <Text style={s.liveKcal}>{live.kcal.toLocaleString()} kcal</Text>
+          <Text style={s.muted}>
+            {unit !== 'g' ? `${Math.round(live.grams)} g` : `${Math.round(qty)} g`}
+            {live.protein != null ? ` · ${Math.round(live.protein)}g protein` : ''}
+          </Text>
+        </View>
+      ) : (
+        <Text style={s.body}>Enter a weight to see the macros.</Text>
+      )}
+
+      {food?.verified ? (
+        <Text style={s.verified}>USDA data</Text>
+      ) : (
+        <Text style={s.muted}>
+          Crowd-sourced label data — check it against the package if it looks off.
+        </Text>
+      )}
 
       {error && <Text style={s.error}>{error}</Text>}
 
       <Pressable
-        style={[s.primary, saving && s.primaryDisabled]}
+        style={[s.primary, (!valid || saving) && s.primaryDisabled]}
         onPress={save}
-        disabled={saving}
+        disabled={!valid || saving}
       >
         {saving
           ? <ActivityIndicator color={color.ground} />
@@ -324,27 +330,29 @@ const s = StyleSheet.create({
   card:      { backgroundColor: color.surface, borderRadius: radius.md,
                padding: space.md, gap: space.sm, borderWidth: 1,
                borderColor: color.line, marginTop: space.md },
-  cardTitle: { ...t.label, color: color.text, fontSize: 15 },
-
-  row:   { flexDirection: 'row', gap: space.sm, alignItems: 'center' },
-  input: { ...t.data, backgroundColor: color.ground, color: color.text,
-           borderRadius: radius.sm, borderWidth: 1, borderColor: color.line,
-           paddingHorizontal: space.md, paddingVertical: space.md, fontSize: 22 },
+  fieldLabel:{ ...t.label, color: color.textMuted, fontSize: 11 },
+  bigInput:  { ...t.data, backgroundColor: color.ground, color: color.text,
+               borderRadius: radius.sm, borderWidth: 1, borderColor: color.line,
+               paddingHorizontal: space.md, paddingVertical: space.md,
+               fontSize: 34 },
 
   unitRow:    { flexDirection: 'row', gap: space.xs },
-  unit:       { paddingHorizontal: space.md, paddingVertical: space.md,
+  unit:       { flex: 1, paddingVertical: space.md, alignItems: 'center',
                 borderRadius: radius.sm, borderWidth: 1, borderColor: color.line },
   unitOn:     { backgroundColor: color.iceDim, borderColor: color.ice },
   unitText:   { ...t.body, color: color.textMuted, fontSize: 14 },
   unitTextOn: { color: color.ice },
 
-  preview:  { ...t.data, color: color.text, fontSize: 20, marginTop: space.xs },
+  liveCard: { backgroundColor: color.surface, borderRadius: radius.md,
+              borderLeftWidth: 3, borderLeftColor: color.ice,
+              padding: space.md, gap: space.xs, marginTop: space.md },
+  liveKcal: { ...t.data, color: color.text, fontSize: 30 },
   verified: { ...t.label, color: color.positive, fontSize: 11 },
 
   primary:         { backgroundColor: color.ice, borderRadius: radius.md,
                      paddingVertical: space.md + 2, alignItems: 'center',
                      marginTop: space.md },
-  primaryDisabled: { opacity: 0.5 },
+  primaryDisabled: { opacity: 0.4 },
   primaryText:     { ...t.display, color: color.ground, fontSize: 16 },
 
   secondary:     { borderWidth: 1, borderColor: color.line, borderRadius: radius.md,

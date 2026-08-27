@@ -1,20 +1,21 @@
 /**
- * Nutrition — food entries and the day's macros.
+ * Nutrition — food entries, the day's macros, and the client's own foods.
  *
  * Same contract as sessions.ts and checkins.ts: a save writes to SQLite and
  * returns. The network is never awaited. The outbox replays it later.
  *
- * The one wrinkle nutrition adds is that TARGETS come from the coach and
- * entries come from the client, so they sync in opposite directions. Targets
- * are pulled and cached read-only; entries are written locally and pushed.
- *
- * Local tables live in localdb.ts alongside every other table:
- * food_log_entries, nutrition_targets_cache, food_items_cache.
+ * Portions are stored AS ENTERED — 6 oz stays 6 oz — because a client who
+ * weighed something wants their own number back, not a converted one. Grams
+ * are stored alongside so the coach can compare portions without redoing the
+ * arithmetic.
  */
 
 import { getDb } from '../lib/localdb';
 import { today } from '../lib/day';
-import { scaleMacros, type FoodResult, type LoggedMacros } from '../lib/foodApi';
+import {
+  scaleMacros, toGrams,
+  type FoodResult, type LoggedMacros, type PortionUnit,
+} from '../lib/foodApi';
 
 export type MealSlot = 'breakfast' | 'lunch' | 'dinner' | 'snack' | 'unsorted';
 
@@ -26,7 +27,8 @@ export type FoodEntry = {
   displayName: string;
   brand: string | null;
   quantity: number;
-  unit: 'g' | 'ml' | 'serving';
+  unit: PortionUnit;
+  grams: number | null;
   energyKj: number;
   proteinG: number | null;
   carbsG: number | null;
@@ -61,18 +63,12 @@ function uuid(): string {
  * Local cache key for a food.
  *
  * Deterministic rather than random, so logging the same protein bar on Monday
- * and Thursday produces ONE row in recents, not two. Provider + their id is
- * unique; falling back to the name covers a source with no id of its own.
+ * and Thursday produces ONE row in recents, not two.
  */
 export function localFoodId(food: FoodResult): string {
   return `${food.source}:${food.sourceRef ?? food.name.toLowerCase()}`;
 }
 
-/**
- * Append to the outbox in the same shape every other repository uses:
- * row_id is the LOCAL id, and client_generated_id is what makes a replay
- * idempotent on the server.
- */
 async function enqueue(
   db: Awaited<ReturnType<typeof getDb>>,
   args: { table: string; rowId: string; cgid: string; operation: string; payload: unknown },
@@ -82,12 +78,8 @@ async function enqueue(
        (table_name, row_id, client_generated_id, operation, payload, created_at)
      VALUES (?,?,?,?,?,?)`,
     [
-      args.table,
-      args.rowId,
-      args.cgid,
-      args.operation,
-      JSON.stringify(args.payload),
-      new Date().toISOString(),
+      args.table, args.rowId, args.cgid, args.operation,
+      JSON.stringify(args.payload), new Date().toISOString(),
     ],
   );
 }
@@ -96,24 +88,17 @@ async function enqueue(
 // Writing.
 // ---------------------------------------------------------------------------
 
-/**
- * Log a food from search or a scan.
- *
- * Two things happen: the food is cached locally so it appears in recents and
- * a re-scan needs no network, and the entry is written with its macros
- * SNAPSHOT. If a food database later corrects a value, what the client logged
- * today does not silently change next week.
- */
 export async function logFood(args: {
   clientId: string;
   food: FoodResult;
   quantity: number;
-  unit: 'g' | 'ml' | 'serving';
+  unit: PortionUnit;
   mealSlot?: MealSlot;
   day?: string;
   source?: 'manual' | 'scan' | 'search';
 }): Promise<FoodEntry> {
   const macros = scaleMacros(args.food, args.quantity, args.unit);
+  const grams = toGrams(args.food, args.quantity, args.unit);
   const foodId = localFoodId(args.food);
 
   await cacheFood(foodId, args.food);
@@ -127,17 +112,18 @@ export async function logFood(args: {
     brand: args.food.brand,
     quantity: args.quantity,
     unit: args.unit,
+    grams,
     macros,
     source: args.source ?? 'search',
   });
 }
 
 /**
- * Quick add: macros typed straight in, no food record.
+ * Quick add: macros typed straight in, logged once, not saved as a food.
  *
- * First-class rather than buried. A client who cannot find what they ate will
- * log an approximation or log nothing, and an approximation is worth far more
- * to a coach than a gap in the week.
+ * Kept alongside custom foods rather than replaced by them. Somebody eating a
+ * one-off at a friend's house does not want to create a permanent record for
+ * it — they want it counted and forgotten.
  */
 export async function quickAdd(args: {
   clientId: string;
@@ -158,6 +144,7 @@ export async function quickAdd(args: {
     brand: null,
     quantity: 1,
     unit: 'serving',
+    grams: null,
     macros: {
       energyKj: args.energyKj,
       proteinG: args.proteinG ?? null,
@@ -177,7 +164,8 @@ async function writeEntry(a: {
   description: string;
   brand: string | null;
   quantity: number;
-  unit: 'g' | 'ml' | 'serving';
+  unit: PortionUnit;
+  grams: number | null;
   macros: LoggedMacros;
   source: string;
 }): Promise<FoodEntry> {
@@ -193,13 +181,13 @@ async function writeEntry(a: {
     await db.runAsync(
       `INSERT INTO food_log_entries
          (id, client_generated_id, client_id, logged_on, meal_slot, logged_at,
-          food_item_id, description, quantity, unit,
+          food_item_id, description, quantity, unit, grams,
           energy_kj, protein_g, carbs_g, fat_g, fiber_g,
           source, updated_at, dirty)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1)`,
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1)`,
       [
         id, cgid, a.clientId, a.day, a.mealSlot, now,
-        a.foodItemId, a.description, a.quantity, a.unit,
+        a.foodItemId, a.description, a.quantity, a.unit, a.grams,
         a.macros.energyKj, a.macros.proteinG, a.macros.carbsG,
         a.macros.fatG, a.macros.fiberG,
         a.source, now,
@@ -219,12 +207,12 @@ async function writeEntry(a: {
         logged_at: now,
         // NOT the local food id. food_items on the server is a uuid FK and the
         // catalogue row does not exist there yet — sending a local key would
-        // fail the constraint. The macros and the name are already on the
-        // entry, so nothing is lost; linking the catalogue is a later job.
+        // fail the constraint. The macros and name are already on the entry.
         food_item_id: null,
         description: a.description,
         quantity: a.quantity,
         unit: a.unit,
+        grams: a.grams,
         energy_kj: a.macros.energyKj,
         protein_g: a.macros.proteinG,
         carbs_g: a.macros.carbsG,
@@ -244,6 +232,7 @@ async function writeEntry(a: {
     brand: a.brand,
     quantity: a.quantity,
     unit: a.unit,
+    grams: a.grams,
     energyKj: a.macros.energyKj,
     proteinG: a.macros.proteinG,
     carbsG: a.macros.carbsG,
@@ -280,6 +269,44 @@ export async function removeEntry(clientGeneratedId: string): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// Custom foods — the client's own.
+// ---------------------------------------------------------------------------
+
+/**
+ * Save a food the client built themselves.
+ *
+ * Stored in the same cache as everything else, so it behaves identically from
+ * that point on: it scales by weight, it shows up in recents, and it can be
+ * logged in oz like anything from USDA. The only difference is where the
+ * numbers came from.
+ */
+export async function saveCustomFood(food: FoodResult): Promise<string> {
+  const id = localFoodId(food);
+  await cacheFood(id, food);
+  return id;
+}
+
+/** Every custom food this client has made, newest first. */
+export async function listCustomFoods(limit = 100): Promise<any[]> {
+  const db = await getDb();
+  return db.getAllAsync<any>(
+    `SELECT * FROM food_items_cache
+      WHERE source = 'custom'
+      ORDER BY last_used_at DESC
+      LIMIT ?`,
+    [limit],
+  );
+}
+
+export async function deleteCustomFood(id: string): Promise<void> {
+  const db = await getDb();
+  await db.runAsync(
+    `DELETE FROM food_items_cache WHERE id = ? AND source = 'custom'`,
+    [id],
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Reading.
 // ---------------------------------------------------------------------------
 
@@ -303,6 +330,7 @@ export async function entriesForDay(clientId: string, day = today()): Promise<Fo
     brand: r.brand_name ?? null,
     quantity: r.quantity,
     unit: r.unit,
+    grams: r.grams ?? null,
     energyKj: r.energy_kj,
     proteinG: r.protein_g,
     carbsG: r.carbs_g,
@@ -355,13 +383,25 @@ export async function macrosForDay(clientId: string, day = today()): Promise<Day
   };
 }
 
-/** Foods eaten before, newest first — the list that makes logging fast.
- *  Most people eat the same forty things, which is why week two of logging
- *  takes a fraction of the taps week one did. */
+/**
+ * Foods eaten before, with the portion used last time.
+ *
+ * The portion is the point. Somebody who weighs 6 oz of chicken most days
+ * wants one tap, not the same six taps every day.
+ */
 export async function recentFoods(clientId: string, limit = 25): Promise<any[]> {
   const db = await getDb();
   return db.getAllAsync<any>(
-    `SELECT f.*, MAX(e.logged_at) AS last_at
+    `SELECT f.*,
+            MAX(e.logged_at) AS last_at,
+            (SELECT quantity FROM food_log_entries q
+              WHERE q.food_item_id = f.id AND q.client_id = e.client_id
+                AND q.deleted_at IS NULL
+              ORDER BY q.logged_at DESC LIMIT 1) AS last_quantity,
+            (SELECT unit FROM food_log_entries q
+              WHERE q.food_item_id = f.id AND q.client_id = e.client_id
+                AND q.deleted_at IS NULL
+              ORDER BY q.logged_at DESC LIMIT 1) AS last_unit
        FROM food_items_cache f
        JOIN food_log_entries e ON e.food_item_id = f.id
       WHERE e.client_id = ? AND e.deleted_at IS NULL
@@ -412,7 +452,7 @@ export async function cacheFood(id: string, food: FoodResult): Promise<void> {
   );
 }
 
-/** A scan that has been seen before never needs the network again. */
+/** A scan seen before never needs the network again. */
 export async function barcodeFromCache(barcode: string): Promise<FoodResult | null> {
   const db = await getDb();
   const row = await db.getFirstAsync<any>(
