@@ -54,6 +54,13 @@
           "recordAudioAndroid": false
         }
       ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Choose an existing photo to use as a progress photo. Your photos stay private to you unless you share a week with your coach.",
+          "cameraPermission": "Take progress photos. They are stored privately and are never shared unless you turn sharing on."
+        }
+      ],
       "expo-asset"
     ],
     "experiments": {

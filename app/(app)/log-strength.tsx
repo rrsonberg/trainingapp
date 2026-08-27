@@ -57,24 +57,37 @@ export default function LogStrengthScreen() {
   const [error, setError] = useState<string | null>(null);
   const [finishing, setFinishing] = useState(false);
 
-  // A second render must not create a second session.
-  const creating = useRef(false);
+  // The session is created by the first exercise, NOT by opening the screen.
+  //
+  // Creating it on mount meant every glance at this screen — including backing
+  // straight out — left an empty in_progress workout behind, and they stacked up
+  // on the home screen under Today. A workout with nothing in it is not a
+  // workout the client did.
+  //
+  // The ref guards the gap between two fast taps: state has not landed yet, so
+  // checking sessionId alone would create two.
+  const creating = useRef<Promise<{ id: string; cgid: string }> | null>(null);
 
-  useEffect(() => {
-    if (creating.current) return;
-    creating.current = true;
+  const ensureSession = useCallback(async () => {
+    if (sessionId && sessionCgid) return { id: sessionId, cgid: sessionCgid };
+    if (creating.current) return creating.current;
 
-    (async () => {
-      try {
-        const s = await createSession({ tenantId, clientId, sessionType: 'strength' });
-        await startSession(s.clientGeneratedId);
-        setSessionId(s.id);
-        setSessionCgid(s.clientGeneratedId);
-      } catch (e: any) {
-        setError(e?.message ?? 'Could not start this workout.');
-      }
+    creating.current = (async () => {
+      const s = await createSession({ tenantId, clientId, sessionType: 'strength' });
+      await startSession(s.clientGeneratedId);
+      setSessionId(s.id);
+      setSessionCgid(s.clientGeneratedId);
+      return { id: s.id, cgid: s.clientGeneratedId };
     })();
-  }, [tenantId, clientId]);
+
+    try {
+      return await creating.current;
+    } catch (e) {
+      // Let the next attempt try again rather than wedging the screen.
+      creating.current = null;
+      throw e;
+    }
+  }, [sessionId, sessionCgid, tenantId, clientId]);
 
   const reload = useCallback(async (id: string) => {
     const list = await listSessionExercises(id);
@@ -98,11 +111,11 @@ export default function LogStrengthScreen() {
   }, [sessionId]);
 
   async function pick(ex: Exercise) {
-    if (!sessionId) return;
     setPicking(false);
     try {
-      await addExercise({ sessionId, exerciseId: ex.id });
-      await reload(sessionId);
+      const { id } = await ensureSession();
+      await addExercise({ sessionId: id, exerciseId: ex.id });
+      await reload(id);
     } catch (e: any) {
       setError(e?.message ?? 'Could not add that exercise.');
     }
@@ -118,14 +131,6 @@ export default function LogStrengthScreen() {
       setError(e?.message ?? 'Could not finish this workout.');
       setFinishing(false);
     }
-  }
-
-  if (!sessionId) {
-    return (
-      <View style={s.boot}>
-        {error ? <Text style={s.error}>{error}</Text> : <ActivityIndicator color={ACCENT} />}
-      </View>
-    );
   }
 
   if (picking) {
@@ -156,7 +161,7 @@ export default function LogStrengthScreen() {
           key={item.sessionExercise.clientGeneratedId}
           item={item}
           previous={history[item.sessionExercise.exerciseId] ?? null}
-          onChanged={() => reload(sessionId)}
+          onChanged={() => sessionId && reload(sessionId)}
           onError={setError}
         />
       ))}

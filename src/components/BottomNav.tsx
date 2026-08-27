@@ -43,12 +43,13 @@ const NAV: NavItem[] = [
 
 /** Everything the + offers. Order is by how often it gets used, not by
  *  category — the top item should be right most of the time. */
-const ACTIONS: { label: string; detail: string; href: string; tint?: string }[] = [
+const ACTIONS: { label: string; detail: string; href: string }[] = [
   { label: 'Log food',        detail: 'Search, scan or your own foods', href: '/log-food' },
   { label: 'Scan a barcode',  detail: 'Straight to the camera',          href: '/scan-food' },
   { label: 'Start a workout', detail: 'Strength session',                href: '/log-strength' },
   { label: 'Log recovery',    detail: 'Sauna, plunge, hyperbaric, more', href: '/log-recovery' },
   { label: 'Daily check-in',  detail: 'Energy, sleep, stress, soreness', href: '/check-in' },
+  { label: 'Progress photos', detail: 'Front, side, back — weekly',      href: '/photos' },
   { label: 'Apple Health',    detail: 'Connect or re-sync',              href: '/connect-health' },
 ];
 
@@ -162,7 +163,7 @@ const s = StyleSheet.create({
   navLabel:  { ...t.label, color: color.textMuted, fontSize: 11 },
   navLabelOn:{ color: color.ice },
 
-  fabSlot: { width: 72, alignItems: 'center' },
+  fabSlot: { width: 64, alignItems: 'center' },
   fab: {
     width: 52, height: 52, borderRadius: 26,
     backgroundColor: color.ice,
