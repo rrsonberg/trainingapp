@@ -16,7 +16,7 @@
 
 import { useCallback, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Link, useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth, useIdentity } from '../../src/lib/auth';
 import { useSync } from '../../src/lib/syncRunner';
 import { listSessions, loadBalance } from '../../src/repositories/sessions';
@@ -51,6 +51,7 @@ function bandColor(band: Readiness['band']) {
 export default function HomeScreen() {
   const { signOut } = useAuth();
   const identity = useIdentity();
+  const router = useRouter();
   const { pending, online, phase } = useSync();
 
   const [readiness, setReadiness] = useState<Readiness | null>(null);
@@ -92,8 +93,10 @@ export default function HomeScreen() {
       </Text>
 
       {/* --- Readiness ------------------------------------------------ */}
-      <Link href="/check-in" asChild>
-        <Pressable style={[s.card, readiness && { borderLeftWidth: 3, borderLeftColor: bandColor(readiness.band) }]}>
+      <Pressable
+        onPress={() => router.push('/check-in')}
+        style={[s.card, readiness && { borderLeftWidth: 3, borderLeftColor: bandColor(readiness.band) }]}
+      >
           {readiness ? (
             <>
               <View style={s.readinessTop}>
@@ -116,8 +119,7 @@ export default function HomeScreen() {
               </Text>
             </>
           )}
-        </Pressable>
-      </Link>
+      </Pressable>
 
       {/* --- Today's sessions ----------------------------------------- */}
       <Text style={s.section}>Today</Text>
@@ -172,29 +174,31 @@ export default function HomeScreen() {
       {/* --- Actions -------------------------------------------------- */}
       <Text style={s.section}>Log</Text>
 
-      <Link href="/log-strength" asChild>
-        <Pressable style={[s.action, { backgroundColor: TRAINING }]}>
-          <Text style={s.actionText}>Start a strength workout</Text>
-        </Pressable>
-      </Link>
+      <Pressable
+        onPress={() => router.push('/log-strength')}
+        style={[s.action, { backgroundColor: TRAINING }]}
+      >
+        <Text style={s.actionText}>Start a strength workout</Text>
+      </Pressable>
 
-      <Link href="/log-recovery" asChild>
-        <Pressable style={[s.action, { backgroundColor: RECOVERY }]}>
-          <Text style={s.actionText}>Log a recovery session</Text>
-        </Pressable>
-      </Link>
+      <Pressable
+        onPress={() => router.push('/log-recovery')}
+        style={[s.action, { backgroundColor: RECOVERY }]}
+      >
+        <Text style={s.actionText}>Log a recovery session</Text>
+      </Pressable>
 
-      <Link href="/connect-health" asChild>
-        <Pressable style={[s.action, s.actionQuiet]}>
-          <Text style={[s.actionText, s.actionQuietText]}>Connect Apple Health</Text>
-        </Pressable>
-      </Link>
+      <Pressable
+        onPress={() => router.push('/connect-health')}
+        style={[s.action, s.actionQuiet]}
+      >
+        <Text style={[s.actionText, s.actionQuietText]}>Connect Apple Health</Text>
+      </Pressable>
 
       {/* Shown only when there is something to say. A permanent "0 pending"
           badge trains people to ignore the one time it matters. */}
       {(pending > 0 || !online) && (
-        <Link href="/pending-writes" asChild>
-          <Pressable style={s.status}>
+        <Pressable onPress={() => router.push('/pending-writes')} style={s.status}>
             <View style={[s.dot, { backgroundColor: online ? color.ice : color.warning }]} />
             <Text style={s.muted}>
               {phase === 'syncing'
@@ -203,8 +207,7 @@ export default function HomeScreen() {
                   ? `Offline - ${pending} waiting to send`
                   : `${pending} waiting to send`}
             </Text>
-          </Pressable>
-        </Link>
+        </Pressable>
       )}
 
       <Pressable style={s.signOut} onPress={signOut}>
