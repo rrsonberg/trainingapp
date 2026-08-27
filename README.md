@@ -17,6 +17,7 @@ Talks to the same Supabase project as the Lovable trainer console.
 | `src/lib/readiness.ts` | Readiness from baselines + check-in; returns its components |
 | `src/lib/health.ts` | HealthKit reads — permissions, recent sync, historical backfill |
 | `src/lib/units.ts` | SI storage, display conversion at render |
+| `src/lib/day.ts` | Local calendar days. Every YYYY-MM-DD in the app comes from here |
 | `src/types/sessions.ts` | The 14 session types and their typed parameters |
 | `src/repositories/sessions.ts` | Offline-first session CRUD + load-balance query |
 | `src/repositories/biometrics.ts` | Offline-first biometric writes, baselines, daily nutrition |
@@ -77,6 +78,14 @@ And on scoring: **never invent a readiness score.** `metricBaseline` refuses
 under fourteen readings; `readinessMath` refuses under 35% signal coverage and
 reports its confidence otherwise. A wrong score is worse than none — it tells
 someone to train through something they should have respected.
+
+## Known gaps in the backend
+
+`session_exercises` and `exercise_sets` have RLS enabled and **zero policies**,
+so every write to them is rejected — the strength logger cannot sync until
+policies exist. Verified against the deployed database; the outbox blocks on
+`new row violates row-level security policy for table "session_exercises"` and
+correctly refuses to skip ahead.
 
 ## Not built yet
 

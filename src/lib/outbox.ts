@@ -18,6 +18,32 @@ import { supabase } from './supabase';
 export type OutboxOperation = 'upsert' | 'soft_delete';
 
 /**
+ * Fired after a write is queued.
+ *
+ * Without this the queue only drains on mount, foreground or reconnect — so a
+ * client who logs a set and keeps the app open watches it sit there, and the
+ * "waiting to send" badge stays stale because nothing recounts it. The listener
+ * decides how urgently to react; this only reports that something changed.
+ */
+type Listener = () => void;
+const listeners = new Set<Listener>();
+
+export function onOutboxChanged(fn: Listener): () => void {
+  listeners.add(fn);
+  return () => listeners.delete(fn);
+}
+
+function notifyOutboxChanged() {
+  for (const fn of listeners) {
+    try {
+      fn();
+    } catch {
+      // A bad listener must never break the write that triggered it.
+    }
+  }
+}
+
+/**
  * The unique key each table upserts against, server-side.
  *
  * This is per-table and cannot be guessed. Verified against the deployed
@@ -67,6 +93,11 @@ export async function enqueue(
       new Date().toISOString(),
     ]
   );
+
+  // After the caller's transaction commits, not inside it — a listener that
+  // starts a drain must not race the very write it was told about. The
+  // microtask is enough: withTransactionAsync has resolved by the time it runs.
+  queueMicrotask(notifyOutboxChanged);
 }
 
 function backoffMs(attempts: number) {
@@ -77,6 +108,12 @@ export type DrainResult = {
   sent: number;
   failed: number;
   remaining: number;
+  /**
+   * Why the drain stopped, if it did. Previously this was swallowed into the
+   * outbox row and nothing above ever saw it, so a queue blocked by a server
+   * rejection looked identical to an empty one.
+   */
+  lastError?: string;
 };
 
 /**
@@ -106,6 +143,7 @@ export async function drainOutbox(): Promise<DrainResult> {
 
   let sent = 0;
   let failed = 0;
+  let lastError: string | undefined;
 
   for (const row of rows) {
     const payload = JSON.parse(row.payload);
@@ -142,6 +180,7 @@ export async function drainOutbox(): Promise<DrainResult> {
       sent++;
     } catch (err: any) {
       failed++;
+      lastError = String(err?.message ?? err);
       const attempts = row.attempts + 1;
 
       if (attempts >= MAX_ATTEMPTS) {
@@ -174,7 +213,7 @@ export async function drainOutbox(): Promise<DrainResult> {
     `SELECT COUNT(*) AS c FROM outbox`
   );
 
-  return { sent, failed, remaining };
+  return { sent, failed, remaining, lastError };
 }
 
 export type StuckWrite = {

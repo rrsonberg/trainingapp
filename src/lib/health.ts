@@ -26,6 +26,7 @@ import type {
   HKUnit,
 } from '@kingstinct/react-native-healthkit';
 import { saveBiometric } from '../repositories/biometrics';
+import { dayKey as localDayKey } from './day';
 
 type HealthKitModule = typeof import('@kingstinct/react-native-healthkit');
 
@@ -154,7 +155,8 @@ export async function requestHealthPermissions(): Promise<boolean> {
 }
 
 function dayKey(d: Date) {
-  return d.toISOString().slice(0, 10);
+  // A night's sleep ending at 6am local must be filed under that local day.
+  return localDayKey(d);
 }
 
 /**

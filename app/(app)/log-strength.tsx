@@ -308,13 +308,20 @@ function ExercisePicker({
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<Exercise[] | null>(null);
 
+  // Debounced. Querying on every keystroke re-renders the list mid-typing, and
+  // a controlled TextInput being re-rendered under a fast typist drops and
+  // reorders characters — typing "squat" reliably produced "quats". 150ms is
+  // below the threshold where search feels laggy and well above a keystroke.
   useEffect(() => {
     let cancelled = false;
-    (async () => {
+    const timer = setTimeout(async () => {
       const r = await searchExercises(query);
       if (!cancelled) setResults(r);
-    })();
-    return () => { cancelled = true; };
+    }, 150);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
   }, [query]);
 
   return (

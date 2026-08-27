@@ -9,6 +9,7 @@
 import * as Crypto from 'expo-crypto';
 import { getDb } from '../lib/localdb';
 import { enqueue } from '../lib/outbox';
+import { dayOffset } from '../lib/day';
 
 export type BiometricSource =
   | 'healthkit' | 'health_connect' | 'manual'
@@ -86,7 +87,7 @@ export async function metricBaseline(
   days = 30
 ) {
   const db = await getDb();
-  const since = new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
+  const since = dayOffset(-days);
   const [row] = await db.getAllAsync<{ avg: number; n: number }>(
     `SELECT AVG(value) AS avg, COUNT(*) AS n FROM biometrics
       WHERE client_id = ? AND metric = ? AND recorded_on >= ?`,

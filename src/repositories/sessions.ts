@@ -7,6 +7,7 @@
 import * as Crypto from 'expo-crypto';
 import { getDb } from '../lib/localdb';
 import { enqueue } from '../lib/outbox';
+import { dayOffset, today } from '../lib/day';
 import {
   MAX_SESSION_SECONDS,
   SESSION_TYPES,
@@ -80,7 +81,9 @@ export async function createSession(input: {
     client_id: input.clientId,
     session_type: input.sessionType,
     status: 'planned' as SessionStatus,
-    scheduled_for: input.scheduledFor ?? now.slice(0, 10),
+    // Local day, not now.slice(0,10): that is the UTC date, which is
+    // tomorrow for anyone west of Greenwich in the evening.
+    scheduled_for: input.scheduledFor ?? today(),
     started_at: null,
     completed_at: null,
     duration_seconds: null,
@@ -227,9 +230,7 @@ export async function listSessions(opts: {
  */
 export async function loadBalance(clientId: string, days = 28) {
   const db = await getDb();
-  const since = new Date(Date.now() - days * 86_400_000)
-    .toISOString()
-    .slice(0, 10);
+  const since = dayOffset(-days);
 
   const rows = await db.getAllAsync<{
     scheduled_for: string;

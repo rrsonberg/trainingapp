@@ -29,7 +29,7 @@ import {
 import { AppState, type AppStateStatus } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
 import { syncNow } from './sync';
-import { pendingCount } from './outbox';
+import { onOutboxChanged, pendingCount } from './outbox';
 import { useAuth } from './auth';
 
 const MIN_INTERVAL_MS = 15_000;
@@ -89,10 +89,17 @@ export function SyncProvider({ children }: { children: ReactNode }) {
           setLastError(null);
         }
         try {
-          await syncNow(clientId);
+          const result = await syncNow(clientId);
           if (mounted.current) {
             setLastSyncedAt(Date.now());
-            setPhase('idle');
+            // A drain that stopped on a rejection is not a successful sync.
+            // Reporting "synced" here is how a blocked queue stays invisible.
+            if (result.push.failed > 0 && result.push.lastError) {
+              setPhase('error');
+              setLastError(result.push.lastError);
+            } else {
+              setPhase('idle');
+            }
           }
         } catch (e: any) {
           // A failed sync is not a failed app. The data is still on disk and
@@ -127,6 +134,15 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       if (next === 'active') void sync();
     });
 
+    // A queued write is the fourth trigger. Without it a client who logs a set
+    // and stays on the screen sees nothing move until they background the app.
+    // Not forced: the throttle is what stops a fast logger from firing a sync
+    // per set, and the count still refreshes immediately either way.
+    const unsubscribeOutbox = onOutboxChanged(() => {
+      void refreshPending();
+      void sync();
+    });
+
     // Seeded true so the first event cannot masquerade as a reconnection.
     let wasOnline = true;
     const unsubscribeNet = NetInfo.addEventListener((state) => {
@@ -145,6 +161,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       mounted.current = false;
       appSub.remove();
       unsubscribeNet();
+      unsubscribeOutbox();
     };
   }, [clientId, sync, refreshPending]);
 

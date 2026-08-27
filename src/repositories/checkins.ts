@@ -10,6 +10,7 @@
 import * as Crypto from 'expo-crypto';
 import { getDb } from '../lib/localdb';
 import { enqueue } from '../lib/outbox';
+import { dayOffset, today as localToday } from '../lib/day';
 
 /** All subjective fields are 1-5. 3 is "normal for me", not "average person". */
 export type Checkin = {
@@ -50,7 +51,7 @@ function rowToCheckin(r: any): Checkin {
 }
 
 export function today(): string {
-  return new Date().toISOString().slice(0, 10);
+  return localToday();
 }
 
 export async function checkinForDay(
@@ -67,7 +68,7 @@ export async function checkinForDay(
 
 export async function recentCheckins(clientId: string, days = 14): Promise<Checkin[]> {
   const db = await getDb();
-  const since = new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
+  const since = dayOffset(-days);
   const rows = await db.getAllAsync<any>(
     `SELECT * FROM daily_checkins
       WHERE client_id = ? AND checkin_date >= ?

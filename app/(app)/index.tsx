@@ -23,6 +23,7 @@ import { listSessions, loadBalance } from '../../src/repositories/sessions';
 import { SESSION_TYPES, type Session } from '../../src/types/sessions';
 import { BAND_COPY, computeReadiness, type Readiness } from '../../src/lib/readiness';
 import { displayDuration } from '../../src/lib/units';
+import { recentDays, today } from '../../src/lib/day';
 import { color, familyColor, radius, space, type as t } from '../../src/theme';
 
 const TRAINING = familyColor('training');
@@ -30,14 +31,6 @@ const RECOVERY = familyColor('recovery');
 const STRIP_HEIGHT = 44;
 
 type DayLoad = { date: string; training: number; recovery: number };
-
-function isoDay(offsetDays = 0): string {
-  return new Date(Date.now() + offsetDays * 86_400_000).toISOString().slice(0, 10);
-}
-
-function lastSevenDays(): string[] {
-  return Array.from({ length: 7 }, (_, i) => isoDay(i - 6));
-}
 
 function weekdayInitial(iso: string): string {
   const d = new Date(`${iso}T00:00:00`);
@@ -64,7 +57,7 @@ export default function HomeScreen() {
     useCallback(() => {
       let cancelled = false;
       (async () => {
-        const day = isoDay();
+        const day = today();
         const [r, s, b] = await Promise.all([
           computeReadiness(identity.clientId, day),
           listSessions({ clientId: identity.clientId, from: day, to: day }),
@@ -79,7 +72,7 @@ export default function HomeScreen() {
     }, [identity.clientId])
   );
 
-  const days = lastSevenDays();
+  const days = recentDays(7);
   const byDate = new Map(balance.map((d) => [d.date, d]));
   // One scale for both halves, so an hour of training and an hour of sauna
   // draw the same length. Different scales would flatter whichever is smaller.
