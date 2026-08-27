@@ -81,11 +81,16 @@ someone to train through something they should have respected.
 
 ## Known gaps in the backend
 
-`session_exercises` and `exercise_sets` have RLS enabled and **zero policies**,
-so every write to them is rejected — the strength logger cannot sync until
-policies exist. Verified against the deployed database; the outbox blocks on
-`new row violates row-level security policy for table "session_exercises"` and
-correctly refuses to skip ahead.
+`session_exercises` and `exercise_sets` shipped with RLS enabled and **zero
+policies**, so every write to them was rejected and the strength logger could
+never sync. The outbox blocks on the rejection and correctly refuses to skip
+ahead, which is why nothing was lost.
+
+`session_exercises` is fixed. **`exercise_sets` still has no policies** — run
+[`backend/rls-exercise-sets.sql`](backend/rls-exercise-sets.sql) against the
+Supabase project to close it. Both sets of policies take their authority from
+the parent session, matching the existing `sessions` policies, and grant no
+DELETE because the client soft-deletes.
 
 ## Not built yet
 
